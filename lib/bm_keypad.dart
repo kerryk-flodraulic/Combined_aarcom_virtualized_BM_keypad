@@ -8,10 +8,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'bluetooth.dart';
 import 'crc32.dart';
 import 'package:flutter/cupertino.dart';
+import 'globals.dart';
+import 'can_log_entry.dart';
 
-
-
-
+/*
 //Log entry model for can messages
 class CanLogEntry {
   final String channel;
@@ -33,7 +33,7 @@ class CanLogEntry {
   });
 }
 
-
+*/
 List<int> dataBytes = List.filled(8, 0); // 8 bytes = 64 bits of state
 List<int> ledBytes = List.filled(8, 0); // For LED states (used by PKP2200)
 
@@ -54,13 +54,13 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   }
 
   void _sendLastRawFrame() {
-    if (canFrameLog.isEmpty) {
+    if (sharedCanLog.isEmpty) {
       //Add \u274c for logo
       debugPrint("No frame in log to send.");
       return;
     }
 
-    final lastEntry = canFrameLog.last;
+    final lastEntry = sharedCanLog.last;
 
     // Parse CAN ID
     final canId = int.tryParse(lastEntry.canId, radix: 16);
@@ -70,11 +70,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     }
 
     // Parse data bytes
-    final dataBytes =
-        lastEntry.data
-            .split(' ')
-            .map((hex) => int.tryParse(hex, radix: 16) ?? 0)
-            .toList();
+    final dataBytes = lastEntry.data
+        .split(' ')
+        .map((hex) => int.tryParse(hex, radix: 16) ?? 0)
+        .toList();
 
     if (dataBytes.length != 8) {
       //add \u274c infront for logo opt
@@ -188,14 +187,13 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
       // Log LED  Frame
       List<int> ledDataBytes = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-      String ledData =
-          ledDataBytes
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join(' ')
-              .toUpperCase();
+      String ledData = ledDataBytes
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
       // Logs the outgoing CAN frame along with button state and timestamp
 
-      canFrameLog.add(
+      sharedCanLog.add(
         CanLogEntry(
           channel: '1',
           canId: '00000180', //225
@@ -225,7 +223,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     }
 
     final allKeys = [...keypad2x2, ...keypad2x6];
-    int initialFrameCount = canFrameLog.length;
+    int initialFrameCount = sharedCanLog.length;
 
     debugPrint('▶Auto Test started with delay $_autoTestDelayMs ms');
 
@@ -245,7 +243,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     setState(() => _currentTestKey = null);
 
     // Show completion result
-    final newFrames = canFrameLog.length - initialFrameCount;
+    final newFrames = sharedCanLog.length - initialFrameCount;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Auto Test complete: $newFrames frames sent')),
     );
@@ -272,14 +270,13 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       }
       dataBytes = List.filled(8, 0);
 
-      String data =
-          dataBytes
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join(' ')
-              .toUpperCase();
+      String data = dataBytes
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
       // Logs the outgoing CAN frame along with button state and timestamp
 
-      canFrameLog.add(
+      sharedCanLog.add(
         CanLogEntry(
           channel: '1',
           canId: '00000195',
@@ -304,12 +301,8 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     }
     final deviceId = CanBluetooth.instance.connectedDevices.keys.first;
     final device = CanBluetooth.instance.scanResults[deviceId]?.device;
-    final name =
-        CanBluetooth
-            .instance
-            .scanResults[deviceId]
-            ?.advertisementData
-            .localName;
+    final name = CanBluetooth
+        .instance.scanResults[deviceId]?.advertisementData.localName;
 
     return name != null && name.isNotEmpty
         ? 'Connected to: $name'
@@ -339,53 +332,50 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           // Filter device names using the user-defined text filter
           final entries =
               CanBluetooth.instance.scanResults.entries.where((entry) {
-                final name =
-                    entry.value.advertisementData.localName.toLowerCase();
-                return name.contains(_deviceNameFilter);
-              }).toList();
+            final name = entry.value.advertisementData.localName.toLowerCase();
+            return name.contains(_deviceNameFilter);
+          }).toList();
 
           return ListView(
-            children:
-                entries.map((entry) {
-                  final device = entry.value.device;
-                  final name = entry.value.advertisementData.localName;
-                  final isConnected = CanBluetooth.instance.connectedDevices
-                      .containsKey(device.remoteId.str);
-                  // Shows signal icon, RSSI in dBm, and device name
-                  return ListTile(
-                    leading: const Icon(Icons.bluetooth),
-                    title: Row(
-                      children: [
-                        Icon(
-                          entry.value.rssi > -60
-                              ? Icons.signal_cellular_4_bar
-                              : entry.value.rssi > -80
+            children: entries.map((entry) {
+              final device = entry.value.device;
+              final name = entry.value.advertisementData.localName;
+              final isConnected = CanBluetooth.instance.connectedDevices
+                  .containsKey(device.remoteId.str);
+              // Shows signal icon, RSSI in dBm, and device name
+              return ListTile(
+                leading: const Icon(Icons.bluetooth),
+                title: Row(
+                  children: [
+                    Icon(
+                      entry.value.rssi > -60
+                          ? Icons.signal_cellular_4_bar
+                          : entry.value.rssi > -80
                               ? Icons.signal_cellular_alt
                               : Icons.signal_cellular_null,
-                          size: 18,
-                          color:
-                              entry.value.rssi > -70
-                                  ? Colors.greenAccent
-                                  : Colors.redAccent,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(name.isNotEmpty ? name : '(Unnamed)'),
-                      ],
+                      size: 18,
+                      color: entry.value.rssi > -70
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
                     ),
-                    subtitle: Text(device.remoteId.str),
-                    // Connection button
-                    trailing: ElevatedButton(
-                      onPressed: () {
-                        if (isConnected) {
-                          CanBluetooth.instance.disconnect(device);
-                        } else {
-                          CanBluetooth.instance.connect(device);
-                        }
-                      },
-                      child: Text(isConnected ? 'Disconnect' : 'Connect'),
-                    ),
-                  );
-                }).toList(),
+                    const SizedBox(width: 6),
+                    Text(name.isNotEmpty ? name : '(Unnamed)'),
+                  ],
+                ),
+                subtitle: Text(device.remoteId.str),
+                // Connection button
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    if (isConnected) {
+                      CanBluetooth.instance.disconnect(device);
+                    } else {
+                      CanBluetooth.instance.connect(device);
+                    }
+                  },
+                  child: Text(isConnected ? 'Disconnect' : 'Connect'),
+                ),
+              );
+            }).toList(),
           );
         },
       ),
@@ -509,7 +499,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                 int index = row * 6 + col;
                 return index < keypad2x6.length
                     ? buildKeypadButton(keypad2x6[index])
-                    : const SizedBox(width: 80, height: 80);
+                    : const SizedBox(width: 56, height: 56);
               }),
             );
           }),
@@ -528,10 +518,9 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
-          transform:
-              buttonStates[label] == true
-                  ? Matrix4.translationValues(0, -2, 0)
-                  : Matrix4.identity(),
+          transform: buttonStates[label] == true
+              ? Matrix4.translationValues(0, -2, 0)
+              : Matrix4.identity(),
           decoration: BoxDecoration(
             color:
                 buttonStates[label] == true ? Colors.green : Colors.grey[800],
@@ -580,7 +569,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   int _autoTestDelayMs = 400; // Default: Normal speed
   String? _currentTestKey; // Used to highlight the active button
 
-  final List<CanLogEntry> canFrameLog = [];
+  //final List<CanLogEntry> canFrameLog = [];
   //CAN log ents.
   final ScrollController _logScrollController = ScrollController();
   // Handles press logic for 2x2 and 2x6 buttons, updates CAN bytes and logs
@@ -633,11 +622,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       ];
 
       // Format message
-      formattedData =
-          keyStateMessage
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join(' ')
-              .toUpperCase();
+      formattedData = keyStateMessage
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
 
       canId = '00000180'; // 0x180 + 0x25 = 0x1A5 (PKP2200 keypad state frame)
 
@@ -648,17 +636,15 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       if ((state & 0x04) != 0) keyStates.add("Key #3");
       if ((state & 0x08) != 0) keyStates.add("Key #4");
 
-      buttonExplanation =
-          keyStates.isEmpty
-              ? "No Key pressed"
-              : keyStates.join(" and ") + " pressed";
+      buttonExplanation = keyStates.isEmpty
+          ? "No Key pressed"
+          : keyStates.join(" and ") + " pressed";
     } else {
       // Handle PKP2600 (standard functional 2x6 buttons)
-      formattedData =
-          dataBytes
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join(' ')
-              .toUpperCase();
+      formattedData = dataBytes
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
 
       canId = '00000195';
     }
@@ -672,9 +658,11 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       time: timestamp,
       button: buttonExplanation,
     );
-
+/*
     setState(() {
-      canFrameLog.add(entry);
+     sharedCanLog.add(CanLogEntry(...));
+canLogUpdated.value = DateTime.now();
+
       if (ledButtonMap.containsKey(label)) {
         // LED frame (red/green/blue support)
         List<int> ledControlFrame = [
@@ -705,6 +693,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         */
       }
     });
+    */
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_autoScrollEnabled &&
@@ -723,7 +712,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   // Clears the entire CAN log and resets the stopwatch
   void _clearLog() {
     setState(() {
-      canFrameLog.clear();
+      sharedCanLog.clear();
       _stopwatch.reset();
       if (!_isTimerRunning) {
         _stopwatch.stop();
@@ -829,7 +818,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         onPressed: () => _handleButtonPress(label),
         icon: Icon(
           icon ?? Icons.help_outline,
-          size: 28,
+          size: 24,
           color: Colors.tealAccent,
         ),
         label: Text(
@@ -837,15 +826,14 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 16,
+            fontSize: 14,
             letterSpacing: 1.1,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              buttonStates[label] == true
-                  ? Colors.green.shade700
-                  : Colors.grey.shade800,
+          backgroundColor: buttonStates[label] == true
+              ? Colors.green.shade700
+              : Colors.grey.shade800,
           elevation: 4,
           shadowColor: Colors.black,
           shape: RoundedRectangleBorder(
@@ -960,17 +948,16 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         Expanded(
           child: ListView.builder(
             controller: _logScrollController,
-            itemCount: canFrameLog.length,
+            itemCount: sharedCanLog.length,
             itemBuilder: (context, index) {
-              final f = canFrameLog[index];
+              final f = sharedCanLog[index];
               final isEven = index % 2 == 0;
-              final isLatest = index == canFrameLog.length - 1;
+              final isLatest = index == sharedCanLog.length - 1;
 
               return Container(
-                color:
-                    isLatest
-                        ? Colors.teal.withOpacity(0.2)
-                        : (isEven ? Colors.black : Colors.grey.shade900),
+                color: isLatest
+                    ? Colors.teal.withOpacity(0.2)
+                    : (isEven ? Colors.black : Colors.grey.shade900),
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 child: Row(
                   children: [
@@ -1004,10 +991,9 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                       child: Text(
                         f.button,
                         style: _rowStyle.copyWith(
-                          color:
-                              f.button.contains('No')
-                                  ? Colors.redAccent
-                                  : Colors.greenAccent,
+                          color: f.button.contains('No')
+                              ? Colors.redAccent
+                              : Colors.greenAccent,
                         ),
                       ),
                     ),
@@ -1047,7 +1033,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
               const Icon(Icons.list_alt, color: Colors.tealAccent, size: 16),
               const SizedBox(width: 4),
               Text(
-                'Frames: ${canFrameLog.length}',
+                'Frames: ${sharedCanLog.length}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(width: 12),
@@ -1065,16 +1051,15 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                 decoration: BoxDecoration(
                   color: _isTimerRunning ? Colors.greenAccent : Colors.grey,
                   shape: BoxShape.circle,
-                  boxShadow:
-                      _isTimerRunning
-                          ? [
-                            BoxShadow(
-                              color: Colors.greenAccent.withOpacity(0.6),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                          : [],
+                  boxShadow: _isTimerRunning
+                      ? [
+                          BoxShadow(
+                            color: Colors.greenAccent.withOpacity(0.6),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : [],
                 ),
               ),
             ],
@@ -1094,8 +1079,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         backgroundColor: Colors.teal.shade800,
         elevation: 2,
         actions: [
-       const SizedBox(width: 0), 
-
+          const SizedBox(width: 0),
         ],
       ),
       body: Column(
@@ -1120,9 +1104,9 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                           style: Theme.of(
                             context,
                           ).textTheme.titleMedium?.copyWith(
-                            color: Colors.tealAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
+                                color: Colors.tealAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ],
                     ),
@@ -1175,103 +1159,98 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 2x2 Keypad Section
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '2x2 Keypad (PKP2200 - Node ID: 25h)',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
+                        padding: const EdgeInsets.all(16),
+                        child: Center(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // 2x2 Keypad Section
+                              Text(
+                                '2x2 Keypad (PKP2200 - Node ID: 25h)',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
                                       color: Colors.tealAccent,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Pressed: ${getPressed2x2Buttons()}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    height: 240,
-                                    child: SingleChildScrollView(
-                                      child: build2x2Keypad(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: _clear2x2Buttons,
-                                    icon: const Icon(Icons.clear),
-                                    label: const Text('Clear 2x2'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade800,
-                                    ),
-                                  ),
-                                ],
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Pressed: ${getPressed2x2Buttons()}',
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: build2x2Keypad(),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: _clear2x2Buttons,
+                                icon: const Icon(Icons.clear),
+                                label: const Text('Clear 2x2'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade800,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
 
-                            // Vertical Divider
-                            VerticalDivider(
-                              width: 32,
-                              thickness: 1,
-                              color: Colors.white24,
-                            ),
+                              const SizedBox(height: 24),
+                              const Divider(color: Colors.white24),
+                              const SizedBox(height: 12),
 
-                            // 2x6 Keypad Section
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '2x6 Keypad (PKP2600 - Node ID: 15h)',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
+                              // 2x6 Keypad Section
+                              Text(
+                                '2x6 Keypad (PKP2600 - Node ID: 15h)',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
                                       color: Colors.tealAccent,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Pressed: ${getPressed2x6Buttons()}',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    height: 240,
-                                    child: SingleChildScrollView(
-                                      child: build2x6Keypad(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: _clear2x6Buttons,
-                                    icon: const Icon(Icons.clear_all),
-                                    label: const Text('Clear 2x6'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Pressed: ${getPressed2x6Buttons()}',
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: build2x6Keypad(),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: _clear2x6Buttons,
+                                icon: const Icon(Icons.clear_all),
+                                label: const Text('Clear 2x6'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade700,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1299,10 +1278,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                                 style: Theme.of(
                                   context,
                                 ).textTheme.headlineSmall?.copyWith(
-                                  color: Colors.tealAccent,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
+                                      color: Colors.tealAccent,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                    ),
                               ),
                             ],
                           ),
@@ -1341,121 +1320,111 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                       horizontal: 16,
                       vertical: 4,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
                       children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _isTimerRunning = !_isTimerRunning;
-                              if (_isTimerRunning) {
-                                _stopwatch.start();
-                              } else {
-                                _stopwatch.stop();
-                              }
-                            });
-                          },
-                          icon: Icon(
-                            _isTimerRunning ? Icons.pause : Icons.play_arrow,
-                          ),
-                          label: Text(
-                            _isTimerRunning ? 'Pause Timer' : 'Resume Timer',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade800,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                        // Row 1
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isTimerRunning = !_isTimerRunning;
+                                  if (_isTimerRunning) {
+                                    _stopwatch.start();
+                                  } else {
+                                    _stopwatch.stop();
+                                  }
+                                });
+                              },
+                              icon: Icon(_isTimerRunning
+                                  ? Icons.pause
+                                  : Icons.play_arrow),
+                              label: Text(_isTimerRunning
+                                  ? 'Pause Timer'
+                                  : 'Resume Timer'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal.shade800,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _startAutoTest,
+                              icon: const Icon(Icons.play_circle_fill),
+                              label: const Text('Run Auto Test'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green.shade700,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _resetTimerOnly,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reset Timer'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueGrey,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
 
-                        const SizedBox(width: 16),
-
-                        ElevatedButton.icon(
-                          onPressed: _startAutoTest,
-                          icon: const Icon(Icons.play_circle_fill),
-                          label: const Text('Run Auto Test'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                        // Row 2
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _clearLog,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Clear Log'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
                             ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 16),
-
-                        ElevatedButton.icon(
-                          onPressed: _resetTimerOnly,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Reset Timer'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueGrey,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _resetAllButtons,
+                              icon: const Icon(Icons.restart_alt),
+                              label: const Text('Reset All'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade700,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
                             ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 16),
-
-                        ElevatedButton.icon(
-                          onPressed: _clearLog,
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Clear Log'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: _sendLastRawFrame,
+                              icon: const Icon(Icons.send_rounded),
+                              label: const Text(
+                                'Send to Kvaser CANKing',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF37474F),
+                                foregroundColor: Colors.white,
+                                elevation: 6,
+                                shadowColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ).copyWith(
+                                overlayColor: MaterialStateProperty.all(
+                                  const Color.fromARGB(255, 59, 172, 78),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 16),
-
-                        ElevatedButton.icon(
-                          onPressed: _resetAllButtons,
-                          icon: const Icon(Icons.restart_alt),
-                          label: const Text('Reset All'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade700,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        ElevatedButton.icon(
-                          onPressed: _sendLastRawFrame,
-                          icon: const Icon(Icons.send_rounded),
-                          label: const Text(
-                            'Send to Kvaser CANKing',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF37474F),
-                            foregroundColor: Colors.white,
-                            elevation: 6,
-                            shadowColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ).copyWith(
-                            overlayColor: MaterialStateProperty.all(
-                              const Color.fromARGB(255, 59, 172, 78),
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),

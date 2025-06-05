@@ -7,10 +7,14 @@ import 'package:permission_handler/permission_handler.dart';
 import 'bluetooth.dart';
 import 'crc32.dart';
 import 'dart:typed_data';
+import 'globals.dart';
+import 'can_log_entry.dart';
 
 // Represents a single CAN frame entry in the log.
 // Used to encapsulate metadata like ID, DLC, data payload, and timestamp.
-class CanLogEntry {
+
+//Removed and placed into one file
+/*class CanLogEntry {
   final String canId; // Hex formatted ID
   final int dlc; // Data length
   final List<String> dataBytes; // D0-D7 in hex
@@ -32,7 +36,7 @@ class CanLogEntry {
       '${timestamp.millisecond.toString().padLeft(3, '0')}';
 }
 
-
+*/
 
 // StatefulWidget for the main CAN Bluetooth UI interface.
 class AARCommRCU extends StatefulWidget {
