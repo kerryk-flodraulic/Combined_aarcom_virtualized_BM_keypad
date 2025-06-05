@@ -7,3 +7,6 @@ final List<CanLogEntry> sharedCanLog = [];
 
 // Shared ValueNotifier to trigger rebuilds when log updates
 final ValueNotifier<DateTime> canLogUpdated = ValueNotifier(DateTime.now());
+
+
+

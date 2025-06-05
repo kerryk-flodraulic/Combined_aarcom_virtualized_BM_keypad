@@ -10,6 +10,7 @@ import 'crc32.dart';
 import 'package:flutter/cupertino.dart';
 import 'globals.dart';
 import 'can_log_entry.dart';
+import 'shared_widgets.dart';
 
 /*
 //Log entry model for can messages
@@ -658,42 +659,62 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       time: timestamp,
       button: buttonExplanation,
     );
-/*
-    setState(() {
-     sharedCanLog.add(CanLogEntry(...));
-canLogUpdated.value = DateTime.now();
 
+    setState(() {
+      final is2x2 =
+          keypad2x2.contains(label); // Checks if the pressed label is from 2x2
+      final canId =
+          is2x2 ? '00000180' : '00000215'; // ✅ Use correct ID based on keypad
+      final elapsedSeconds =
+          (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2);
+
+      // Log main CAN frame
+      sharedCanLog.add(CanLogEntry(
+        channel: 'CH0',
+        canId: canId,
+        dlc: '8',
+        data: dataBytes
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ')
+            .toUpperCase(),
+        dir: 'TX',
+        time: elapsedSeconds,
+        button: '$label Pressed',
+      ));
+
+      canLogUpdated.value = DateTime.now();
+
+      // Log LED frame if mapped
       if (ledButtonMap.containsKey(label)) {
-        // LED frame (red/green/blue support)
         List<int> ledControlFrame = [
-          ledBytes[0], // RED
-          ledBytes[1], // GREEN
-          ledBytes[2], // BLUE
-          0x00, 0x00, 0x00, 0x00, 0x00,
+          ledBytes[0],
+          ledBytes[1],
+          ledBytes[2],
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
         ];
 
-        String ledFormattedData =
-            ledControlFrame
-                .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                .join(' ')
-                .toUpperCase();
-
-        //Commented out because this should be under receiving
-        /*
-        canFrameLog.add(CanLogEntry(
+        String ledFormattedData = ledControlFrame
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join(' ')
+            .toUpperCase();
+/*
+        sharedCanLog.add(CanLogEntry(
           channel: 'CH0',
-          canId: '215', //  LED control frame ID
+          canId: canId,
           dlc: '8',
           data: ledFormattedData,
           dir: 'TX',
-          time: timestamp,
-          button: 'LED Update',
+          time: elapsedSeconds,
+          button: 'LED Update ($label)',
         ));
-
-        */
+*/
+        canLogUpdated.value = DateTime.now();
       }
     });
-    */
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_autoScrollEnabled &&

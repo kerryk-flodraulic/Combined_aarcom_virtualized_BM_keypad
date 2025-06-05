@@ -9,6 +9,7 @@ import 'crc32.dart';
 import 'dart:typed_data';
 import 'globals.dart';
 import 'can_log_entry.dart';
+import 'shared_widgets.dart';
 
 // Represents a single CAN frame entry in the log.
 // Used to encapsulate metadata like ID, DLC, data payload, and timestamp.
@@ -265,7 +266,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
     //Initialize BT manager and begin scanning for devices
     CanBluetooth.instance.init();
 
-    //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
+   /* just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
     CanBluetooth.instance.startScan(
       onDeviceFound: (device, advertisementData) async {
         final name = advertisementData.localName;
@@ -276,6 +277,8 @@ class _AARCommRCUState extends State<AARCommRCU> {
         }
       },
     );
+*/
+CanBluetooth.instance.startScan();
 
     //Begin listening for incomming  BT CAN Messages
     _listenToBluetoothMessages();
