@@ -1008,7 +1008,7 @@ CanBluetooth.instance.startScan();
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      // Avoids notches on iOS/Android
+      
       child: Scaffold(
         appBar: AppBar(
           title: const Text('AARCOMM Virtualalized RCU'),

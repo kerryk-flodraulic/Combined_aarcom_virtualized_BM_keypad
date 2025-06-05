@@ -42,6 +42,8 @@ final Map<String, bool> buttonStates = {}; // Tracks ON/OFF state
 
 //Main screen with keypad and CAN log display
 class BMKeypadScreen extends StatefulWidget {
+
+
   const BMKeypadScreen({super.key});
 
   @override
@@ -1090,8 +1092,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade900,
       appBar: AppBar(
@@ -1113,31 +1114,66 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                 children: [
                   const SizedBox(height: 8),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.bluetooth, color: Colors.tealAccent),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Bluetooth Device Scanner',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleMedium?.copyWith(
-                                color: Colors.tealAccent,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
+            Padding(
+  padding: const EdgeInsets.symmetric(vertical: 12.0),
+  child: Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const Icon(
+        Icons.bluetooth,
+        color: Colors.tealAccent,
+        size: 38, 
+      ),
+      const SizedBox(width: 8),
+      Text(
+        'Bluetooth Device Scanner',
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.tealAccent,
+              fontWeight: FontWeight.bold,
+              fontSize: 20, 
+            ),
+      ),
+    ],
+  ),
+),
+
 
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: scanControl(),
                   ),
-
+ //Device stat. display
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Tooltip(
+                    message: 'Connected to: $connectedDeviceName',
+                    preferBelow: false,
+                    waitDuration: const Duration(milliseconds: 300),
+                    child: Icon(
+                      Icons.bluetooth_connected,
+                      size: 28,
+                      color: connectedDeviceName == 'Not connected'
+                          ? Colors.grey
+                          : Colors.tealAccent,
+                    ),
+                  ),
+                  //Text feild to filter scanned devices by name
+                  const SizedBox(width: 8),
+                  Text(
+                    connectedDeviceName == 'Not connected'
+                        ? 'No device connected'
+                        : 'Connected to: $connectedDeviceName',
+                    style: TextStyle(
+                      color: connectedDeviceName == 'Not connected'
+                          ? Colors.grey
+                          : Colors.tealAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
                   // Filter Field
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1169,6 +1205,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: bluetoothDeviceList(),
                   ),
+      
 
                   // Keypad Card
                   Padding(
@@ -1477,6 +1514,9 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   }
 }
 
+
+
+
 const TextStyle _headerStyle = TextStyle(
   color: Colors.white,
   fontWeight: FontWeight.bold,
@@ -1489,3 +1529,6 @@ const TextStyle _rowStyle = TextStyle(
   fontFamily: 'Courier',
   fontSize: 12.5,
 );
+
+
+
