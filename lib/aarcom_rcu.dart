@@ -265,8 +265,8 @@ class _AARCommRCUState extends State<AARCommRCU> {
     _ensureBluetoothPermissions();
     //Initialize BT manager and begin scanning for devices
     CanBluetooth.instance.init();
-
-   /* just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
+//Pratik mentioned may not be necessary
+   //just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
     CanBluetooth.instance.startScan(
       onDeviceFound: (device, advertisementData) async {
         final name = advertisementData.localName;
@@ -277,7 +277,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
         }
       },
     );
-*/
+
 CanBluetooth.instance.startScan();
 
     //Begin listening for incomming  BT CAN Messages
@@ -1033,7 +1033,7 @@ CanBluetooth.instance.startScan();
                     waitDuration: const Duration(milliseconds: 300),
                     child: Icon(
                       Icons.bluetooth_connected,
-                      size: 28,
+                      size: 24,
                       color: connectedDeviceName == 'Not connected'
                           ? Colors.grey
                           : Colors.tealAccent,
@@ -1232,9 +1232,9 @@ CanBluetooth.instance.startScan();
                                 _applyGroupFilter(); // Refresh UI log view with current filters
                               });
 
-                              //  Wait 500 milliseconds before moving to the next button
+                              //  Wait 1 second before moving onto the next button Wait 500 milliseconds before moving to the next button
                               await Future.delayed(
-                                  const Duration(milliseconds: 500));
+                                  const Duration(seconds: 1));
                               //const Duration(seconds: 5) );
                             }
 
@@ -1489,8 +1489,8 @@ CanBluetooth.instance.startScan();
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Bluetooth icon (left)
-          const Icon(Icons.bluetooth, color: Colors.tealAccent),
-
+          const Icon(Icons.bluetooth, color: Colors.tealAccent, size: 24),
+          
           const SizedBox(width: 8),
 
           // Header title

@@ -42,8 +42,6 @@ final Map<String, bool> buttonStates = {}; // Tracks ON/OFF state
 
 //Main screen with keypad and CAN log display
 class BMKeypadScreen extends StatefulWidget {
-
-
   const BMKeypadScreen({super.key});
 
   @override
@@ -55,6 +53,11 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     final pressed = keypad2x2.where((k) => buttonStates[k] == true).toList();
     return pressed.isEmpty ? 'None' : pressed.join(', ');
   }
+// new to prevent duplicates:
+
+  bool _autoTestRunOnce = false;
+  bool _autoTestHasRun = false;
+
 
   void _sendLastRawFrame() {
     if (sharedCanLog.isEmpty) {
@@ -228,7 +231,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     final allKeys = [...keypad2x2, ...keypad2x6];
     int initialFrameCount = sharedCanLog.length;
 
-    debugPrint('▶Auto Test started with delay $_autoTestDelayMs ms');
+    debugPrint('Auto Test started with delay $_autoTestDelayMs ms');
 
     // PRESS phase — one by one
     for (String key in allKeys) {
@@ -244,12 +247,13 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     _resetAllButtons();
 
     setState(() => _currentTestKey = null);
-
+/*
     // Show completion result
     final newFrames = sharedCanLog.length - initialFrameCount;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Auto Test complete: $newFrames frames sent')),
     );
+    */
   }
 
   //Clears only 2x6 keypad and logs
@@ -429,7 +433,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     CanBluetooth.instance.init();
     CanBluetooth.instance.startScan();
 
-    // Try to auto-connect and run auto test
+    // NEW AUTO CONNECT feauture - Pratik said it may not be necessary
     Future.delayed(const Duration(seconds: 2), () async {
       final targetId = 'fd000000000i0'.toLowerCase();
       final matches = CanBluetooth.instance.scanResults.values.where((result) {
@@ -441,16 +445,16 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       if (matches.isNotEmpty) {
         final device = matches.first.device;
         await CanBluetooth.instance.connect(device);
-        debugPrint(' Auto-connected to $targetId');
+        debugPrint('Auto-connected to $targetId');
 
-        // Wait a little after connection, then run auto test
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            _startAutoTest();
-          }
-        });
-      } else {
-        debugPrint(' Auto-connect: target device not found');
+        if (!_autoTestRunOnce) {
+          _autoTestRunOnce = true;
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+             // _startAutoTest();
+            }
+          });
+        }
       }
     });
 
@@ -582,10 +586,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     final timestamp =
         '${elapsed.inSeconds}.${(elapsed.inMilliseconds % 1000).toString().padLeft(3, '0')}s';
 
-    // Toggle button state
+    // Toggle the state
     buttonStates[label] = !(buttonStates[label] ?? false);
 
-    // Handle 2x6 functional buttons (control bytes)
+    // Update 2x6 data bytes if applicable
     if (buttonBitMap.containsKey(label)) {
       final byteIndex = buttonBitMap[label]![0];
       final bitIndex = buttonBitMap[label]![1];
@@ -596,7 +600,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       }
     }
 
-    // Handle 2x2 LED buttons (LED control bytes)
+    // Update 2x2 LED bytes if applicable
     if (ledButtonMap.containsKey(label)) {
       final byteIndex = ledButtonMap[label]![0];
       final bitIndex = ledButtonMap[label]![1];
@@ -609,113 +613,65 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
     String formattedData;
     String canId;
-    String buttonExplanation = label;
+    String buttonExplanation;
 
-    // Handle PKP2200SI: 2x2 keys = custom CAN frame format
+    // For 2x2 (LED-based PKP2200)
     if (ledButtonMap.containsKey(label)) {
       List<int> keyStateMessage = [
-        ledBytes[0], // Byte 0: K4-K1 state
+        ledBytes[0],
         0x00,
         0x00,
         0x00,
         0x00,
         0x00,
         0x00,
-        0x00,
+        0x00
       ];
 
-      // Format message
       formattedData = keyStateMessage
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ')
           .toUpperCase();
 
-      canId = '00000180'; // 0x180 + 0x25 = 0x1A5 (PKP2200 keypad state frame)
-
-      int state = ledBytes[0];
-      List<String> keyStates = [];
-      if ((state & 0x01) != 0) keyStates.add("Key #1");
-      if ((state & 0x02) != 0) keyStates.add("Key #2");
-      if ((state & 0x04) != 0) keyStates.add("Key #3");
-      if ((state & 0x08) != 0) keyStates.add("Key #4");
-
-      buttonExplanation = keyStates.isEmpty
-          ? "No Key pressed"
-          : keyStates.join(" and ") + " pressed";
-    } else {
-      // Handle PKP2600 (standard functional 2x6 buttons)
+      canId = '00000180';
+      buttonExplanation = buttonStates[label] == true
+          ? 'Key #$label pressed'
+          : 'Key #$label released';
+    } else if (buttonBitMap.containsKey(label)) {
+      // For 2x6 functional PKP2600
       formattedData = dataBytes
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ')
           .toUpperCase();
 
       canId = '00000195';
+      buttonExplanation = buttonStates[label] == true
+          ? 'Key #$label pressed'
+          : 'Key #$label released';
+    } else {
+      // Fallback
+      formattedData = List.filled(8, 0)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
+
+      canId = '00000000';
+      buttonExplanation = 'Key #$label toggled';
     }
 
     final entry = CanLogEntry(
-      channel: '1',
+      channel: 'CH0',
       canId: canId,
       dlc: '8',
       data: formattedData,
       dir: 'TX',
-      time: timestamp,
+      time: (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
       button: buttonExplanation,
     );
 
     setState(() {
-      final is2x2 =
-          keypad2x2.contains(label); // Checks if the pressed label is from 2x2
-      final canId =
-          is2x2 ? '00000180' : '00000215'; // ✅ Use correct ID based on keypad
-      final elapsedSeconds =
-          (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2);
-
-      // Log main CAN frame
-      sharedCanLog.add(CanLogEntry(
-        channel: 'CH0',
-        canId: canId,
-        dlc: '8',
-        data: dataBytes
-            .map((b) => b.toRadixString(16).padLeft(2, '0'))
-            .join(' ')
-            .toUpperCase(),
-        dir: 'TX',
-        time: elapsedSeconds,
-        button: '$label Pressed',
-      ));
-
+      sharedCanLog.add(entry);
       canLogUpdated.value = DateTime.now();
-
-      // Log LED frame if mapped
-      if (ledButtonMap.containsKey(label)) {
-        List<int> ledControlFrame = [
-          ledBytes[0],
-          ledBytes[1],
-          ledBytes[2],
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-        ];
-
-        String ledFormattedData = ledControlFrame
-            .map((b) => b.toRadixString(16).padLeft(2, '0'))
-            .join(' ')
-            .toUpperCase();
-/*
-        sharedCanLog.add(CanLogEntry(
-          channel: 'CH0',
-          canId: canId,
-          dlc: '8',
-          data: ledFormattedData,
-          dir: 'TX',
-          time: elapsedSeconds,
-          button: 'LED Update ($label)',
-        ));
-*/
-        canLogUpdated.value = DateTime.now();
-      }
     });
 
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -1092,7 +1048,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     );
   }
 
-Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade900,
       appBar: AppBar(
@@ -1114,66 +1070,70 @@ Widget build(BuildContext context) {
                 children: [
                   const SizedBox(height: 8),
 
-            Padding(
-  padding: const EdgeInsets.symmetric(vertical: 12.0),
-  child: Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      const Icon(
-        Icons.bluetooth,
-        color: Colors.tealAccent,
-        size: 38, 
-      ),
-      const SizedBox(width: 8),
-      Text(
-        'Bluetooth Device Scanner',
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.tealAccent,
-              fontWeight: FontWeight.bold,
-              fontSize: 20, 
-            ),
-      ),
-    ],
-  ),
-),
-
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.bluetooth,
+                          color: Colors.tealAccent,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Bluetooth Device Scanner',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.tealAccent,
+                            shadows: [
+                              Shadow(
+                                blurRadius: 3,
+                                color: Colors.black45,
+                                offset: Offset(1, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: scanControl(),
                   ),
- //Device stat. display
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Tooltip(
-                    message: 'Connected to: $connectedDeviceName',
-                    preferBelow: false,
-                    waitDuration: const Duration(milliseconds: 300),
-                    child: Icon(
-                      Icons.bluetooth_connected,
-                      size: 28,
-                      color: connectedDeviceName == 'Not connected'
-                          ? Colors.grey
-                          : Colors.tealAccent,
-                    ),
+                  //Device stat. display
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Tooltip(
+                        message: 'Connected to: $connectedDeviceName',
+                        preferBelow: false,
+                        waitDuration: const Duration(milliseconds: 300),
+                        child: Icon(
+                          Icons.bluetooth_connected,
+                          size: 28,
+                          color: connectedDeviceName == 'Not connected'
+                              ? Colors.grey
+                              : Colors.tealAccent,
+                        ),
+                      ),
+                      //Text feild to filter scanned devices by name
+                      const SizedBox(width: 8),
+                      Text(
+                        connectedDeviceName,
+                        style: TextStyle(
+                          color: connectedDeviceName == 'Not connected'
+                              ? Colors.grey
+                              : Colors.tealAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
-                  //Text feild to filter scanned devices by name
-                  const SizedBox(width: 8),
-                  Text(
-                    connectedDeviceName == 'Not connected'
-                        ? 'No device connected'
-                        : 'Connected to: $connectedDeviceName',
-                    style: TextStyle(
-                      color: connectedDeviceName == 'Not connected'
-                          ? Colors.grey
-                          : Colors.tealAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
                   // Filter Field
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1199,14 +1159,13 @@ Widget build(BuildContext context) {
                       },
                     ),
                   ),
-
+             
                   // Device List
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: bluetoothDeviceList(),
                   ),
-      
-
+                  buildControlHeader(),
                   // Keypad Card
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -1409,7 +1368,12 @@ Widget build(BuildContext context) {
                             ),
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
-                              onPressed: _startAutoTest,
+                              onPressed: () {
+                                if (!_autoTestHasRun) {
+                                  _autoTestHasRun = true;
+                                  _startAutoTest();
+                                }
+                              },
                               icon: const Icon(Icons.play_circle_fill),
                               label: const Text('Run Auto Test'),
                               style: ElevatedButton.styleFrom(
@@ -1512,10 +1476,36 @@ Widget build(BuildContext context) {
       ),
     );
   }
+  Widget buildControlHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.key, color: Colors.tealAccent),
+          const SizedBox(width: 8),
+          const Text(
+            'Blink Marine Control Keypads 2x2 & 2x6',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.tealAccent,
+              shadows: [
+                Shadow(
+                  blurRadius: 3,
+                  color: Colors.black45,
+                  offset: Offset(1, 1),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.keyboard, color: Colors.tealAccent),
+        ],
+      ),
+    );
+  }
 }
-
-
-
 
 const TextStyle _headerStyle = TextStyle(
   color: Colors.white,
@@ -1529,6 +1519,3 @@ const TextStyle _rowStyle = TextStyle(
   fontFamily: 'Courier',
   fontSize: 12.5,
 );
-
-
-
