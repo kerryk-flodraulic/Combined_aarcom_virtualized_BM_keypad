@@ -1,3 +1,5 @@
+//PROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID 
+
 //Keypad 2x2 and keypad 2x6 official application
 
 import 'package:flutter/material.dart';
@@ -11,6 +13,9 @@ import 'package:flutter/cupertino.dart';
 import 'globals.dart';
 import 'can_log_entry.dart';
 import 'shared_widgets.dart';
+
+const int canId2x2 = 0x195;
+const int canId2x6 = 0x1A5;
 
 /*
 //Log entry model for can messages
@@ -52,6 +57,11 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   String getPressed2x2Buttons() {
     final pressed = keypad2x2.where((k) => buttonStates[k] == true).toList();
     return pressed.isEmpty ? 'None' : pressed.join(', ');
+  }
+
+  String _describePressedKeys() {
+    final keys = keypad2x2.where((k) => buttonStates[k] == true).toList();
+    return keys.isEmpty ? 'None' : keys.join(', ');
   }
 
   bool _showFixedFeed = false;
@@ -126,12 +136,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   }
 
   // Handles press logic for 2x2 and 2x6 buttons, updates CAN bytes and logs
-  final List<String> keypad2x2 = [
-  'K1', 
-  'K2', 
-  'K3',
-   'K4'
-   ]; // K = Keypad PKP2200
+  final List<String> keypad2x2 = ['K1', 'K2', 'K3', 'K4']; // K = Keypad PKP2200
   // Defines button labels for the 2x6 PKP2600 keypad (F1–F12)
   final List<String> keypad2x6 = [
     'F1',
@@ -176,26 +181,26 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   // NEW BITMAP:
 
   final Map<String, List<int>> ledButtonMap = {
-  'K1': [0, 4],
-  'K2': [0, 5],
-  'K3': [0, 6],
-  'K4': [0, 7],
-};
+    'K1': [0, 0], // Bit 0
+    'K2': [0, 1], // Bit 1
+    'K3': [0, 2], // Bit 2
+    'K4': [0, 3], // Bit 3
+  };
 
-final Map<String, List<int>> buttonBitMap = {
-  'F1': [0, 0],
-  'F2': [0, 1],
-  'F3': [0, 2],
-  'F4': [0, 3],
-  'F5': [0, 4],
-  'F6': [0, 5],
-  'F7': [1, 0],
-  'F8': [1, 1],
-  'F9': [1, 2],
-  'F10': [1, 3],
-  'F11': [1, 4],
-  'F12': [1, 5],
-};
+  final Map<String, List<int>> buttonBitMap = {
+    'F1': [0, 0],
+    'F2': [0, 1],
+    'F3': [0, 2],
+    'F4': [0, 3],
+    'F5': [0, 4],
+    'F6': [0, 5],
+    'F7': [0, 6],
+    'F8': [0, 7],
+    'F9': [1, 0],
+    'F10': [1, 1],
+    'F11': [1, 2],
+    'F12': [1, 3],
+  };
 
   //Reset all buttons and Led Data bytes
   void _resetAllButtons() {
@@ -240,7 +245,7 @@ final Map<String, List<int>> buttonBitMap = {
 
       sharedCanLog.add(
         CanLogEntry(
-          channel: '1',
+          channel: 'CH0',
           canId: '00000195', //225
           dlc: '8',
           data: ledData,
@@ -324,7 +329,7 @@ final Map<String, List<int>> buttonBitMap = {
 
       sharedCanLog.add(
         CanLogEntry(
-          channel: '1',
+          channel: 'CH0',
           canId: '000001A5',
           dlc: '8',
           data: data,
@@ -335,12 +340,12 @@ final Map<String, List<int>> buttonBitMap = {
       );
     });
   }
-List<int> getByteValues() {
-  return dataBytes; 
-}
 
+  List<int> getByteValues() {
+    return dataBytes;
+  }
 
-  List<String> createCanFrame(List<int> bytes, Duration duration) {
+  List<String> createCanFrame(List<int> bytes, Duration duration, int canId) {
     final formattedTime = _formatDuration(duration);
     final dataString = bytes
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -354,7 +359,8 @@ List<int> getByteValues() {
 
     return [
       '1', // Channel
-      '00000190', // CAN ID (you may change this if needed)
+      canId.toRadixString(16).padLeft(8, '0'), // Proper dynamic CAN ID
+
       '8', // DLC
       dataString, // Data payload
       formattedTime, // Timestamp
@@ -363,16 +369,36 @@ List<int> getByteValues() {
     ];
   }
 
+  int _getCurrentCanId() {
+    // If any 2x2 key is pressed, return 0x195
+    if (keypad2x2.any((k) => buttonStates[k] == true)) {
+      return canId2x2;
+    }
+    // If any 2x6 key is pressed, return 0x1A5
+    if (keypad2x6.any((k) => buttonStates[k] == true)) {
+      return canId2x6;
+    }
+    // Default fallback
+    return 0x000;
+  }
+
   void _startLiveFeed() {
     _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = DateTime.now();
       final elapsed = now.difference(firstButtonPressTime ?? now);
 
-      final bytes = getByteValues(); // Get D1–D8 from current button states
+      final hasAnyPressed = keypad2x2.any((k) => buttonStates[k] == true) ||
+          keypad2x6.any((k) => buttonStates[k] == true);
+      if (!hasAnyPressed) return;
 
-      final frame = createCanFrame(bytes, elapsed);
+      final bytes = getByteValues();
+      // Skip if no button is pressed (prevents spamming 'No buttons pressed')
+      if (!buttonStates.values.any((v) => v == true)) return;
 
-      final key = '${frame[3]}|${frame[6]}'; // data | button
+    //  Only build a frame if buttons are pressed
+      final frame = createCanFrame(bytes, elapsed, _getCurrentCanId());
+
+      final key = '${frame[3]}|${frame[6]}';
       fixedCanHistoryMap[key] = frame;
 
       sharedCanLog.add(
@@ -683,6 +709,12 @@ List<int> getByteValues() {
   late final Stopwatch _stopwatch; //Tracks elapsed time
   late final Timer _timer; //Triggers UI to refresh every 100ms
   bool _isTimerRunning = true; // Controls pause/resume
+  int _tickCounter = 0;
+
+  int _nextTickByte() {
+    _tickCounter = (_tickCounter + 1) % 256;
+    return _tickCounter;
+  }
 
   //Added for testing
   int _autoTestDelayMs = 400; // Default: Normal speed
@@ -700,7 +732,7 @@ List<int> getByteValues() {
 
     // Toggle the state
     buttonStates[label] = !(buttonStates[label] ?? false);
-/*
+    /*
     // Update 2x6 data bytes if applicable
     if (buttonBitMap.containsKey(label)) {
       final byteIndex = buttonBitMap[label]![0];
@@ -711,23 +743,23 @@ List<int> getByteValues() {
         dataBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
-*/
+        */
 
-//NEW BITMAP:
+    //NEW BITMAP:
 
-// Update 2x6 data bytes if applicable
-if (buttonBitMap.containsKey(label)) {
-  final byteIndex = buttonBitMap[label]![0];
-  final bitIndex = buttonBitMap[label]![1];
-  if (buttonStates[label] == true) {
-    dataBytes[byteIndex] |= (1 << bitIndex);
-  } else {
-    dataBytes[byteIndex] &= ~(1 << bitIndex);
-  }
-  _sendFunctionFrame(); // Send over Bluetooth
-}
+    // Update 2x6 data bytes if applicable
+    if (buttonBitMap.containsKey(label)) {
+      final byteIndex = buttonBitMap[label]![0];
+      final bitIndex = buttonBitMap[label]![1];
+      if (buttonStates[label] == true) {
+        dataBytes[byteIndex] |= (1 << bitIndex);
+      } else {
+        dataBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+      _sendFunctionFrame(); // Send over Bluetooth
+    }
 
-/*
+    /*
     // Update 2x2 LED bytes if applicable
     if (ledButtonMap.containsKey(label)) {
       final byteIndex = ledButtonMap[label]![0];
@@ -738,38 +770,36 @@ if (buttonBitMap.containsKey(label)) {
         ledBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
-*/
+      */
 
-//NEW BITMAP:
-
-// Update 2x2 LED bytes if applicable
-if (ledButtonMap.containsKey(label)) {
-  final byteIndex = ledButtonMap[label]![0];
-  final bitIndex = ledButtonMap[label]![1];
-  if (buttonStates[label] == true) {
-    ledBytes[byteIndex] |= (1 << bitIndex);
-  } else {
-    ledBytes[byteIndex] &= ~(1 << bitIndex);
-  }
-  _sendLEDFrame(); // Send over Bluetooth
-}
+    //NEW BITMAP:
 
     String formattedData;
     String canId;
     String buttonExplanation;
 
-    // For 2x2 (LED-based PKP2200)
     if (ledButtonMap.containsKey(label)) {
+      final byteIndex = ledButtonMap[label]![0];
+      final bitIndex = ledButtonMap[label]![1];
+
+      if (buttonStates[label] == true) {
+        ledBytes[byteIndex] |= (1 << bitIndex);
+      } else {
+        ledBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+
       List<int> keyStateMessage = [
         ledBytes[0],
         0x00,
         0x00,
         0x00,
-        0x00,
+        _nextTickByte(), // Use the updated tick generator
         0x00,
         0x00,
         0x00
       ];
+
+      _sendLEDFrame(); // Send over Bluetooth
 
       formattedData = keyStateMessage
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -777,9 +807,8 @@ if (ledButtonMap.containsKey(label)) {
           .toUpperCase();
 
       canId = '00000195';
-      buttonExplanation = buttonStates[label] == true
-          ? 'Key #$label pressed'
-          : 'Key #$label released';
+      buttonExplanation =
+          buttonStates[label] == true ? '$label pressed' : '$label released';
     } else if (buttonBitMap.containsKey(label)) {
       // For 2x6 functional PKP2600
       formattedData = dataBytes
@@ -788,9 +817,8 @@ if (ledButtonMap.containsKey(label)) {
           .toUpperCase();
 
       canId = '000001A5';
-      buttonExplanation = buttonStates[label] == true
-          ? 'Key #$label pressed'
-          : 'Key #$label released';
+      buttonExplanation =
+          buttonStates[label] == true ? '$label pressed' : '$label released';
     } else {
       // Fallback
       formattedData = List.filled(8, 0)
@@ -811,6 +839,18 @@ if (ledButtonMap.containsKey(label)) {
       time: (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
       button: buttonExplanation,
     );
+
+    // Log to Fixed Feed as well
+    final frameKey = '$formattedData|$buttonExplanation';
+    fixedCanHistoryMap[frameKey] = [
+      'CH0',
+      canId,
+      '8',
+      formattedData,
+      (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+      'TX',
+      buttonExplanation,
+    ];
 
     setState(() {
       sharedCanLog.add(entry);
@@ -1738,33 +1778,47 @@ if (ledButtonMap.containsKey(label)) {
       ),
     );
   }
+
 //NEW BITMAP
   void _sendFunctionFrame() {
-  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-    CanBluetooth.instance.sendCANMessage(
-      CanBluetooth.instance.connectedDevices.keys.first,
-      BlueMessage(
-        identifier: 0x000001A5,
-        data: dataBytes,
-        flagged: true,
-      ),
-    );
+    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+      CanBluetooth.instance.sendCANMessage(
+        CanBluetooth.instance.connectedDevices.keys.first,
+        BlueMessage(
+          identifier: 0x000001A5,
+          data: dataBytes,
+          flagged: true,
+        ),
+      );
+    }
   }
-}
 
-void _sendLEDFrame() {
-  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+  void _sendLEDFrame() {
+    if (CanBluetooth.instance.connectedDevices.isEmpty) return;
+
+    final deviceId = CanBluetooth.instance.connectedDevices.keys.first;
+
+    final ledFrameData = [
+      ledBytes[0], // Byte 0: bits for K1–K4
+      0x00, // Byte 1 (not used)
+      0x00, // Byte 2 (not used)
+      0x00, // Byte 3 (not used)
+      _nextTickByte(), // Byte 4 = tick timer
+      0x00,
+      0x00,
+      0x00
+    ];
+
+    // Send actual CAN frame
     CanBluetooth.instance.sendCANMessage(
-      CanBluetooth.instance.connectedDevices.keys.first,
+      deviceId,
       BlueMessage(
         identifier: 0x00000195,
-        data: ledBytes,
+        data: ledFrameData,
         flagged: true,
       ),
     );
   }
-}
-
 }
 
 const TextStyle _headerStyle = TextStyle(
