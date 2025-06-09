@@ -316,7 +316,7 @@ DateTime? firstButtonPressTime;
 
   return [
     '1',               // Channel
-    '0CFF0171',        // CAN ID (you may change this if needed)
+    '00000190',        // CAN ID (you may change this if needed)
     '8',               // DLC
     dataString,        // Data payload
     formattedTime,     // Timestamp
@@ -335,7 +335,7 @@ void _startLiveFeed() {
 
     final frame = createCanFrame(bytes, elapsed);
 
-    // ✅ Log the frame into sharedCanLog (used in your UI)
+  
     sharedCanLog.add(
       CanLogEntry(
         channel: frame[0],
@@ -354,7 +354,7 @@ void _startLiveFeed() {
         CanBluetooth.instance.connectedDevices.keys.first,
         BlueMessage(
           data: bytes,
-          identifier: 0x0CFF0171, // Use your correct CAN ID logic if needed
+          identifier: 0x0CFF0171,
           flagged: true,
         ),
       );
