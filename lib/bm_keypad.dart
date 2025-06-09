@@ -53,14 +53,17 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     final pressed = keypad2x2.where((k) => buttonStates[k] == true).toList();
     return pressed.isEmpty ? 'None' : pressed.join(', ');
   }
+
+  bool _showFixedFeed = false;
+  Map<String, List<String>> fixedCanHistoryMap = {};
+
 // new to prevent duplicates:
 
   bool _autoTestRunOnce = false;
   bool _autoTestHasRun = false;
 
-Timer? _liveCanTimer;
-DateTime? firstButtonPressTime;
-
+  Timer? _liveCanTimer;
+  DateTime? firstButtonPressTime;
 
   void _sendLastRawFrame() {
     if (sharedCanLog.isEmpty) {
@@ -305,63 +308,64 @@ DateTime? firstButtonPressTime;
   }
 
   List<String> createCanFrame(List<int> bytes, Duration duration) {
-  final formattedTime = _formatDuration(duration);
-  final dataString =
-      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ').toUpperCase();
+    final formattedTime = _formatDuration(duration);
+    final dataString = bytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join(' ')
+        .toUpperCase();
 
-  final pressed = [
-    ...keypad2x2.where((k) => buttonStates[k] == true),
-    ...keypad2x6.where((k) => buttonStates[k] == true),
-  ].join(', ');
+    final pressed = [
+      ...keypad2x2.where((k) => buttonStates[k] == true),
+      ...keypad2x6.where((k) => buttonStates[k] == true),
+    ].join(', ');
 
-  return [
-    '1',               // Channel
-    '00000190',        // CAN ID (you may change this if needed)
-    '8',               // DLC
-    dataString,        // Data payload
-    formattedTime,     // Timestamp
-    'TX',     // Direction
-    pressed.isEmpty ? 'No buttons pressed' : pressed,
-  ];
-}
+    return [
+      '1', // Channel
+      '00000190', // CAN ID (you may change this if needed)
+      '8', // DLC
+      dataString, // Data payload
+      formattedTime, // Timestamp
+      'TX', // Direction
+      pressed.isEmpty ? 'No buttons pressed' : pressed,
+    ];
+  }
 
+  void _startLiveFeed() {
+    _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now();
+      final elapsed = now.difference(firstButtonPressTime ?? now);
 
-void _startLiveFeed() {
-  _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-    final now = DateTime.now();
-    final elapsed = now.difference(firstButtonPressTime ?? now);
+      final bytes = getByteValues(); // Get D1–D8 from current button states
 
-    final bytes = getByteValues(); // Get D1–D8 from current button states
+      final frame = createCanFrame(bytes, elapsed);
 
-    final frame = createCanFrame(bytes, elapsed);
+      final key = '${frame[3]}|${frame[6]}'; // data | button
+      fixedCanHistoryMap[key] = frame;
 
-  
-    sharedCanLog.add(
-      CanLogEntry(
-        channel: frame[0],
-        canId: frame[1],
-        dlc: frame[2],
-        data: frame[3],
-        time: frame[4],
-        dir: frame[5],
-        button: frame[6],
-      ),
-    );
-
-  
-    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-      CanBluetooth.instance.sendCANMessage(
-        CanBluetooth.instance.connectedDevices.keys.first,
-        BlueMessage(
-          data: bytes,
-          identifier: 0x0CFF0171,
-          flagged: true,
+      sharedCanLog.add(
+        CanLogEntry(
+          channel: frame[0],
+          canId: frame[1],
+          dlc: frame[2],
+          data: frame[3],
+          time: frame[4],
+          dir: frame[5],
+          button: frame[6],
         ),
       );
-    }
-  });
-}
 
+      if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+        CanBluetooth.instance.sendCANMessage(
+          CanBluetooth.instance.connectedDevices.keys.first,
+          BlueMessage(
+            data: bytes,
+            identifier: 0x0CFF0171,
+            flagged: true,
+          ),
+        );
+      }
+    });
+  }
 
   // Returns the name of the currently connected Bluetooth device (or fallback)
   String get connectedDeviceName {
@@ -388,12 +392,11 @@ void _startLiveFeed() {
   }
 
   String _formatDuration(Duration d) {
-  final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  final millis = (d.inMilliseconds % 1000).toString().padLeft(3, '0');
-  return '$minutes:$seconds.$millis';
-}
-
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final millis = (d.inMilliseconds % 1000).toString().padLeft(3, '0');
+    return '$minutes:$seconds.$millis';
+  }
 
   // Builds the Bluetooth scan results list with signal strength and connect/disconnect control
   Widget bluetoothDeviceList() {
@@ -521,7 +524,7 @@ void _startLiveFeed() {
           _autoTestRunOnce = true;
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
-             // _startAutoTest();
+              // _startAutoTest();
             }
           });
         }
@@ -533,16 +536,14 @@ void _startLiveFeed() {
     });
 
     firstButtonPressTime = DateTime.now();
-_startLiveFeed();
-
+    _startLiveFeed();
   }
 
   @override
-void dispose() {
-  _liveCanTimer?.cancel(); // Cancel periodic timer
-  super.dispose();
-}
-
+  void dispose() {
+    _liveCanTimer?.cancel(); // Cancel periodic timer
+    super.dispose();
+  }
 
   Widget build2x2Keypad() {
     return Padding(
@@ -643,7 +644,6 @@ void dispose() {
   }
 
   //Cacnels timer to avoid mem leaks
-
 
   late final Stopwatch _stopwatch; //Tracks elapsed time
   late final Timer _timer; //Triggers UI to refresh every 100ms
@@ -1000,16 +1000,46 @@ void dispose() {
             ],
           ),
         ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () => setState(() => _showFixedFeed = false),
+              child: Text(
+                'Live Feed',
+                style: TextStyle(
+                  fontWeight:
+                      !_showFixedFeed ? FontWeight.bold : FontWeight.normal,
+                  color: !_showFixedFeed ? Colors.tealAccent : Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            TextButton(
+              onPressed: () => setState(() => _showFixedFeed = true),
+              child: Text(
+                'Fixed Feed',
+                style: TextStyle(
+                  fontWeight:
+                      _showFixedFeed ? FontWeight.bold : FontWeight.normal,
+                  color: _showFixedFeed ? Colors.tealAccent : Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+
         // Scrollable log area
         Expanded(
           child: ListView.builder(
             controller: _logScrollController,
-            itemCount: sharedCanLog.length,
+            itemCount: logToDisplay.length,
             itemBuilder: (context, index) {
-              final f = sharedCanLog[index];
-              final isEven = index % 2 == 0;
-              final isLatest = index == sharedCanLog.length - 1;
+              final f = logToDisplay[index];
+              final isLatest = index == logToDisplay.length - 1;
 
+              final isEven = index % 2 == 0;
               return Container(
                 color: isLatest
                     ? Colors.teal.withOpacity(0.2)
@@ -1125,6 +1155,23 @@ void dispose() {
     );
   }
 
+  List<CanLogEntry> get logToDisplay {
+    if (_showFixedFeed) {
+      return fixedCanHistoryMap.values
+          .map((f) => CanLogEntry(
+                channel: f[0],
+                canId: f[1],
+                dlc: f[2],
+                data: f[3],
+                time: f[4],
+                dir: f[5],
+                button: f[6],
+              ))
+          .toList();
+    } else {
+      return sharedCanLog;
+    }
+  }
 
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1237,7 +1284,7 @@ void dispose() {
                       },
                     ),
                   ),
-             
+
                   // Device List
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1383,6 +1430,47 @@ void dispose() {
                           const SizedBox(height: 6),
                         ],
                       ),
+                    ),
+                  ),
+
+                  // Toggle buttons for switching feed mode
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _showFixedFeed = false),
+                          child: Text(
+                            'Live Feed',
+                            style: TextStyle(
+                              fontWeight: !_showFixedFeed
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: !_showFixedFeed
+                                  ? Colors.greenAccent
+                                  : Colors.white70,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _showFixedFeed = true),
+                          child: Text(
+                            'Fixed Feed',
+                            style: TextStyle(
+                              fontWeight: _showFixedFeed
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _showFixedFeed
+                                  ? Colors.greenAccent
+                                  : Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -1554,6 +1642,7 @@ void dispose() {
       ),
     );
   }
+
   Widget buildControlHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
