@@ -11,6 +11,8 @@ import 'globals.dart';
 import 'can_log_entry.dart';
 import 'shared_widgets.dart';
 
+
+//REMOVE VIBRATOR BECAUSE WE USED IT FROM ANOTHER DOCUMENT
 // Represents a single CAN frame entry in the log.
 // Used to encapsulate metadata like ID, DLC, data payload, and timestamp.
 
@@ -265,9 +267,10 @@ class _AARCommRCUState extends State<AARCommRCU> {
     _ensureBluetoothPermissions();
     //Initialize BT manager and begin scanning for devices
     CanBluetooth.instance.init();
-//Pratik mentioned may not be necessary
+//Pratik mentioned may not be necessary - REMOVE WHEN TESTING
    //just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
-    CanBluetooth.instance.startScan(
+   
+   /* CanBluetooth.instance.startScan(
       onDeviceFound: (device, advertisementData) async {
         final name = advertisementData.localName;
         final id = device.remoteId.str;
@@ -277,6 +280,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
         }
       },
     );
+    */
 
 CanBluetooth.instance.startScan();
 

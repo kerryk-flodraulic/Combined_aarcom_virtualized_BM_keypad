@@ -185,7 +185,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
       // Send Cleared Frame PKP2200
       final clearedFrame = BlueMessage(
-        identifier: 0x00000180,
+        identifier: 0x00000195,
         data: List.filled(8, 0x00),
         flagged: true,
       );
@@ -202,7 +202,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       sharedCanLog.add(
         CanLogEntry(
           channel: '1',
-          canId: '00000180', //225
+          canId: '00000195', //225
           dlc: '8',
           data: ledData,
           dir: 'TX',
@@ -213,7 +213,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
       // Send LED Frame over Bluetooth
       final ledFrame = BlueMessage(
-        identifier: 0x00000180,
+        identifier: 0x00000195,
         data: [0x0F, 0x0F, 0x0F, 0x0F, 0x00, 0x00, 0x00, 0x00],
         flagged: true,
       );
@@ -286,7 +286,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       sharedCanLog.add(
         CanLogEntry(
           channel: '1',
-          canId: '00000195',
+          canId: '000001A5',
           dlc: '8',
           data: data,
           dir: 'TX',
@@ -633,7 +633,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .join(' ')
           .toUpperCase();
 
-      canId = '00000180';
+      canId = '00000195';
       buttonExplanation = buttonStates[label] == true
           ? 'Key #$label pressed'
           : 'Key #$label released';
@@ -644,7 +644,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .join(' ')
           .toUpperCase();
 
-      canId = '00000195';
+      canId = '000001A5';
       buttonExplanation = buttonStates[label] == true
           ? 'Key #$label pressed'
           : 'Key #$label released';
@@ -1427,7 +1427,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
                               onPressed: _sendLastRawFrame,
                               icon: const Icon(Icons.send_rounded),
                               label: const Text(
-                                'Send to Kvaser CANKing',
+                                'Send to CANKing',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               style: ElevatedButton.styleFrom(
