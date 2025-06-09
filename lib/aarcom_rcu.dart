@@ -11,8 +11,7 @@ import 'globals.dart';
 import 'can_log_entry.dart';
 import 'shared_widgets.dart';
 
-
-//REMOVE VIBRATOR BECAUSE WE USED IT FROM ANOTHER DOCUMENT
+//REMOVE VIBRATOR BECAUSE WE USED IT FROM ANOTHER
 // Represents a single CAN frame entry in the log.
 // Used to encapsulate metadata like ID, DLC, data payload, and timestamp.
 
@@ -220,7 +219,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
     'Dozer in(F4), Tank Lower': false,
     'Door Open': false,
     'Door Close': false,
-    'Vibrator': false,
+    //'Vibrator': false,
     'Wand Required': false,
     'Wand Off': false,
     'Wand Dropped': false,
@@ -241,7 +240,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
     'Door': ['Door Unlock', 'Door Lock', 'Door Open', 'Door Close'],
     'Dozer': ['Dozer out(F4), Tank Raise', 'Dozer in(F4), Tank Lower'],
     'Wand': ['Wand Required', 'Wand Off', 'Wand Dropped', 'Wand Fault'],
-    'Vibrator': ['Vibrator'],
+    //'Vibrator': ['Vibrator'],
   };
 
   //Set icons for button sections
@@ -255,7 +254,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
     'Door': Icons.door_front_door,
     'Dozer': Icons.agriculture,
     'Wand': Icons.build_circle,
-    'Vibrator': Icons.vibration,
+    // 'Vibrator': Icons.vibration,
   };
 
   @override
@@ -268,9 +267,9 @@ class _AARCommRCUState extends State<AARCommRCU> {
     //Initialize BT manager and begin scanning for devices
     CanBluetooth.instance.init();
 //Pratik mentioned may not be necessary - REMOVE WHEN TESTING
-   //just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
-   
-   /* CanBluetooth.instance.startScan(
+    //just changed  //NEWWW : Auto connects to know device with the id 'fd00... ON STARTUP
+
+    /* CanBluetooth.instance.startScan(
       onDeviceFound: (device, advertisementData) async {
         final name = advertisementData.localName;
         final id = device.remoteId.str;
@@ -282,7 +281,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
     );
     */
 
-CanBluetooth.instance.startScan();
+    CanBluetooth.instance.startScan();
 
     //Begin listening for incomming  BT CAN Messages
     _listenToBluetoothMessages();
@@ -360,7 +359,7 @@ CanBluetooth.instance.startScan();
       'Dozer in(F4), Tank Lower': [3, 6],
       'Door Open': [3, 7],
       'Door Close': [4, 0],
-      'Vibrator': [4, 1],
+      //'Vibrator': [4, 1],
       'Wand Required': [8, 0],
       'Wand Off': [8, 1],
       'Wand Dropped': [8, 2],
@@ -541,7 +540,7 @@ CanBluetooth.instance.startScan();
       'Vacuum',
       'Boom Extension',
       'Dozer',
-      'Vibrator'
+      //'Vibrator'
     ];
 
     // Builds a card widget for each control group (e.g., Water Pump, Boom Movement)
@@ -1012,7 +1011,6 @@ CanBluetooth.instance.startScan();
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      
       child: Scaffold(
         appBar: AppBar(
           title: const Text('AARCOMM Virtualalized RCU'),
@@ -1237,8 +1235,7 @@ CanBluetooth.instance.startScan();
                               });
 
                               //  Wait 1 second before moving onto the next button Wait 500 milliseconds before moving to the next button
-                              await Future.delayed(
-                                  const Duration(seconds: 1));
+                              await Future.delayed(const Duration(seconds: 1));
                               //const Duration(seconds: 5) );
                             }
 
@@ -1257,7 +1254,121 @@ CanBluetooth.instance.startScan();
                           // Button Icon and Label
                           icon: const Icon(
                               Icons.bolt), // Shows a lightning bolt icon
-                          label: const Text('Run Auto Test'), // Button text
+                          label:
+                              const Text('Run Individual Test'), // Button text
+                        ),
+
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.auto_fix_high),
+                          label: const Text('Run Combo Test'),
+
+                          // Combo test logic: randomly press 3–5 buttons at once for 10 rounds
+                          onPressed: () async {
+                            // Check if a Bluetooth device is connected
+                            if (CanBluetooth
+                                .instance.connectedDevices.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Bluetooth device not connected')),
+                              );
+                              return;
+                            }
+
+                            // Get list of all control button labels (e.g. 'Water Pump On', 'Boom Up')
+                            final allKeys = states.keys.toList();
+
+                            // Run 10 combo test iterations
+                            for (int i = 0; i < 10; i++) {
+                              allKeys.shuffle(); // Randomize order of buttons
+                              final combo = allKeys
+                                  .take(3 + (i % 3))
+                                  .toList(); // Select 3–5 buttons
+
+                              setState(() {
+                                // Update the label shown in the UI
+                                _currentTestLabel =
+                                    'Combo Test ${i + 1}: ${combo.join(', ')}';
+
+                                // Turn OFF all buttons first to reset state
+                                states.updateAll((_, __) => false);
+
+                                // Turn ON buttons in the current combo set
+                                for (String control in combo) {
+                                  states[control] = true;
+
+                                  // Apply exclusivity rules to disable conflicting buttons
+                                  final exclusivityRules = {
+                                    'Water Pump On': ['Water Pump Off'],
+                                    'Water Pump Off': ['Water Pump On'],
+                                    'Water Pressure Increase': [
+                                      'Water Pressure Decrease'
+                                    ],
+                                    'Water Pressure Decrease': [
+                                      'Water Pressure Increase'
+                                    ],
+                                    'Engine Increase': ['Engine Decrease'],
+                                    'Engine Decrease': ['Engine Increase'],
+                                    'Vacuum On': ['Vacuum Off'],
+                                    'Vacuum Off': ['Vacuum On'],
+                                    'Boom Up': ['Boom Down'],
+                                    'Boom Down': ['Boom Up'],
+                                    'Boom Left': ['Boom Right'],
+                                    'Boom Right': ['Boom Left'],
+                                    'Door Unlock': ['Door Lock'],
+                                    'Door Lock': ['Door Unlock'],
+                                    'Door Open': ['Door Close'],
+                                    'Door Close': ['Door Open'],
+                                    'Boom Retract': ['Boom Extend'],
+                                    'Boom Extend': ['Boom Retract'],
+                                    'Dozer out(F4), Tank Raise': [
+                                      'Dozer in(F4), Tank Lower'
+                                    ],
+                                    'Dozer in(F4), Tank Lower': [
+                                      'Dozer out(F4), Tank Raise'
+                                    ],
+                                  };
+
+                                  // Disable conflicting buttons based on exclusivity rules
+                                  if (exclusivityRules.containsKey(control)) {
+                                    for (var other
+                                        in exclusivityRules[control]!) {
+                                      states[other] = false;
+                                    }
+                                  }
+                                }
+
+                                // Convert current button state to byte array
+                                final bytes = getByteValues();
+
+                                // Create a CAN frame with timestamp
+                                final frame = createCanFrame(
+                                  bytes,
+                                  DateTime.now()
+                                      .difference(firstButtonPressTime!),
+                                );
+
+                                // Log the CAN frame (fixed = deduped, canHistory = full log)
+                                final key = '${frame[3]}|${frame[6]}';
+                                fixedCanHistoryMap[key] = frame;
+                                canHistory.add(frame);
+                                _applyGroupFilter(); // Refresh log table view
+                              });
+
+                              // Wait 1 second before moving to next combo
+                              await Future.delayed(const Duration(seconds: 1));
+                            }
+
+                            // After all tests, reset all buttons and clear the UI test label
+                            setState(() {
+                              states.updateAll((_, __) => false);
+                              _currentTestLabel = 'Combo Test Complete';
+                            });
+                          },
                         ),
 
                         // SEND TO CANKING BUTTON
@@ -1494,7 +1605,7 @@ CanBluetooth.instance.startScan();
         children: [
           // Bluetooth icon (left)
           const Icon(Icons.bluetooth, color: Colors.tealAccent, size: 24),
-          
+
           const SizedBox(width: 8),
 
           // Header title
