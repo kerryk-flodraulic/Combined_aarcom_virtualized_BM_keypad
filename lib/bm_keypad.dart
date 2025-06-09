@@ -126,7 +126,12 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
   }
 
   // Handles press logic for 2x2 and 2x6 buttons, updates CAN bytes and logs
-  final List<String> keypad2x2 = ['K1', 'K2', 'K3', 'K4']; // K = Keypad PKP2200
+  final List<String> keypad2x2 = [
+  'K1', 
+  'K2', 
+  'K3',
+   'K4'
+   ]; // K = Keypad PKP2200
   // Defines button labels for the 2x6 PKP2600 keypad (F1–F12)
   final List<String> keypad2x6 = [
     'F1',
@@ -142,6 +147,8 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     'F11',
     'F12',
   ];
+
+  /*
   // Maps 2x2 keys (PKP2200) to LED control byte/bit positions in CAN frames
   final Map<String, List<int>> ledButtonMap = {
     'K1': [0, 0],
@@ -164,6 +171,32 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     'F11': [1, 4],
     'F12': [1, 5],
   };
+  */
+
+  // NEW BITMAP:
+
+  final Map<String, List<int>> ledButtonMap = {
+  'K1': [0, 4],
+  'K2': [0, 5],
+  'K3': [0, 6],
+  'K4': [0, 7],
+};
+
+final Map<String, List<int>> buttonBitMap = {
+  'F1': [0, 0],
+  'F2': [0, 1],
+  'F3': [0, 2],
+  'F4': [0, 3],
+  'F5': [0, 4],
+  'F6': [0, 5],
+  'F7': [1, 0],
+  'F8': [1, 1],
+  'F9': [1, 2],
+  'F10': [1, 3],
+  'F11': [1, 4],
+  'F12': [1, 5],
+};
+
   //Reset all buttons and Led Data bytes
   void _resetAllButtons() {
     setState(() {
@@ -302,10 +335,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       );
     });
   }
+List<int> getByteValues() {
+  return dataBytes; 
+}
 
-  List<int> getByteValues() {
-    return [0x00, ...dataBytes];
-  }
 
   List<String> createCanFrame(List<int> bytes, Duration duration) {
     final formattedTime = _formatDuration(duration);
@@ -505,7 +538,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
     CanBluetooth.instance.init();
     CanBluetooth.instance.startScan();
-
+/*
     // NEW AUTO CONNECT feauture - Pratik said it may not be necessary
     Future.delayed(const Duration(seconds: 2), () async {
       final targetId = 'fd000000000i0'.toLowerCase();
@@ -530,6 +563,8 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         }
       }
     });
+
+    */
 
     CanBluetooth.instance.addedDevice.addListener(() {
       setState(() {});
@@ -665,7 +700,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
     // Toggle the state
     buttonStates[label] = !(buttonStates[label] ?? false);
-
+/*
     // Update 2x6 data bytes if applicable
     if (buttonBitMap.containsKey(label)) {
       final byteIndex = buttonBitMap[label]![0];
@@ -676,7 +711,23 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         dataBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
+*/
 
+//NEW BITMAP:
+
+// Update 2x6 data bytes if applicable
+if (buttonBitMap.containsKey(label)) {
+  final byteIndex = buttonBitMap[label]![0];
+  final bitIndex = buttonBitMap[label]![1];
+  if (buttonStates[label] == true) {
+    dataBytes[byteIndex] |= (1 << bitIndex);
+  } else {
+    dataBytes[byteIndex] &= ~(1 << bitIndex);
+  }
+  _sendFunctionFrame(); // Send over Bluetooth
+}
+
+/*
     // Update 2x2 LED bytes if applicable
     if (ledButtonMap.containsKey(label)) {
       final byteIndex = ledButtonMap[label]![0];
@@ -687,6 +738,21 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
         ledBytes[byteIndex] &= ~(1 << bitIndex);
       }
     }
+*/
+
+//NEW BITMAP:
+
+// Update 2x2 LED bytes if applicable
+if (ledButtonMap.containsKey(label)) {
+  final byteIndex = ledButtonMap[label]![0];
+  final bitIndex = ledButtonMap[label]![1];
+  if (buttonStates[label] == true) {
+    ledBytes[byteIndex] |= (1 << bitIndex);
+  } else {
+    ledBytes[byteIndex] &= ~(1 << bitIndex);
+  }
+  _sendLEDFrame(); // Send over Bluetooth
+}
 
     String formattedData;
     String canId;
@@ -1672,6 +1738,33 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       ),
     );
   }
+//NEW BITMAP
+  void _sendFunctionFrame() {
+  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+    CanBluetooth.instance.sendCANMessage(
+      CanBluetooth.instance.connectedDevices.keys.first,
+      BlueMessage(
+        identifier: 0x000001A5,
+        data: dataBytes,
+        flagged: true,
+      ),
+    );
+  }
+}
+
+void _sendLEDFrame() {
+  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+    CanBluetooth.instance.sendCANMessage(
+      CanBluetooth.instance.connectedDevices.keys.first,
+      BlueMessage(
+        identifier: 0x00000195,
+        data: ledBytes,
+        flagged: true,
+      ),
+    );
+  }
+}
+
 }
 
 const TextStyle _headerStyle = TextStyle(
