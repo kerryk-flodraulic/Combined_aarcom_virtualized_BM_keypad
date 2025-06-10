@@ -123,6 +123,53 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       "Sent raw frame from log: ID=${canId.toRadixString(16).padLeft(3, '0').toUpperCase()} DATA=${dataBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ')}",
     );
   }
+void _runComboTest() async {
+  final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
+  if (deviceId == null) {
+    debugPrint('No device connected for combo test.');
+    return;
+  }
+
+  const int comboIterations = 10;
+
+  for (int i = 0; i < comboIterations; i++) {
+    // Pick 3–5 random 2x6 keys
+    final random = keypad2x6.toList()..shuffle();
+    final comboKeys = random.take(3 + i % 3).toList(); // 3–5 buttons
+
+    debugPrint('Combo $i: ${comboKeys.join(', ')}');
+
+    // Press all selected keys
+    for (final key in comboKeys) {
+      if (!buttonStates[key]!) {
+        _handleButtonPress(key); // press & log
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    }
+
+    // Hold them briefly
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // Release all keys silently (no log)
+    for (final key in comboKeys) {
+      buttonStates[key] = false;
+
+      // Clear bits
+      if (buttonBitMap.containsKey(key)) {
+        final byteIndex = buttonBitMap[key]![0];
+        final bitIndex = buttonBitMap[key]![1];
+        dataBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+    }
+
+    // Send cleared frame (optional)
+    _sendFunctionFrame();
+
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  debugPrint('Combo test completed.');
+}
 
   bool _isDarkMode = true;
   bool _autoScrollEnabled = true;
@@ -1621,7 +1668,22 @@ void _startAutoTest() async {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 10),
                               ),
+
+                              
                             ),
+
+                            const SizedBox(width: 16),
+ElevatedButton.icon(
+  onPressed: _runComboTest,
+  icon: const Icon(Icons.shuffle),
+  label: const Text('Run Combo Test'),
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.deepPurple.shade700,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+  ),
+),
+
+                            
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
                               onPressed: _resetTimerOnly,
