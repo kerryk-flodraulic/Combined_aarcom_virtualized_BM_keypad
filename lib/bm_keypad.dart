@@ -291,7 +291,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     _resetAllButtons();
 
     setState(() => _currentTestKey = null);
-/*
+  /*
     // Show completion result
     final newFrames = sharedCanLog.length - initialFrameCount;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -325,19 +325,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ')
           .toUpperCase();
-      // Logs the outgoing CAN frame along with button state and timestamp
 
-      sharedCanLog.add(
-        CanLogEntry(
-          channel: 'CH0',
-          canId: '000001A5',
-          dlc: '8',
-          data: data,
-          dir: 'TX',
-          time: _elapsedFormatted,
-          button: '2x6 Cleared',
-        ),
-      );
     });
   }
 
@@ -358,16 +346,18 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     ].join(', ');
 
     return [
-      '1', // Channel
+      //'CH0', // Channel COMMENTED OUT 
       canId.toRadixString(16).padLeft(8, '0'), // Proper dynamic CAN ID
 
       '8', // DLC
       dataString, // Data payload
       formattedTime, // Timestamp
       'TX', // Direction
-      pressed.isEmpty ? 'No buttons pressed' : pressed,
+     pressed.isEmpty ? 'No buttons pressed' : pressed,
     ];
+    
   }
+  
 
   int _getCurrentCanId() {
     // If any 2x2 key is pressed, return 0x195
@@ -1106,34 +1096,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
             ],
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextButton(
-              onPressed: () => setState(() => _showFixedFeed = false),
-              child: Text(
-                'Live Feed',
-                style: TextStyle(
-                  fontWeight:
-                      !_showFixedFeed ? FontWeight.bold : FontWeight.normal,
-                  color: !_showFixedFeed ? Colors.tealAccent : Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            TextButton(
-              onPressed: () => setState(() => _showFixedFeed = true),
-              child: Text(
-                'Fixed Feed',
-                style: TextStyle(
-                  fontWeight:
-                      _showFixedFeed ? FontWeight.bold : FontWeight.normal,
-                  color: _showFixedFeed ? Colors.tealAccent : Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
+        
         const SizedBox(height: 4),
 
         // Scrollable log area

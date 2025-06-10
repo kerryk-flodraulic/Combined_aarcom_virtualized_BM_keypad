@@ -9,4 +9,6 @@ final List<CanLogEntry> sharedCanLog = [];
 final ValueNotifier<DateTime> canLogUpdated = ValueNotifier(DateTime.now());
 
 
+//NEW 
+final Map<String, bool> buttonStates = {};
 
