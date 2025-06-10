@@ -1,4 +1,4 @@
-//PROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID 
+//PROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID
 
 //Keypad 2x2 and keypad 2x6 official application
 
@@ -291,7 +291,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     _resetAllButtons();
 
     setState(() => _currentTestKey = null);
-  /*
+    /*
     // Show completion result
     final newFrames = sharedCanLog.length - initialFrameCount;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -325,12 +325,12 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join(' ')
           .toUpperCase();
-
     });
   }
 
   List<int> getByteValues() {
-    return dataBytes;
+    final activeKeys = buttonStates.values.any((v) => v == true);
+    return activeKeys ? dataBytes : List.filled(8, 0x00);
   }
 
   List<String> createCanFrame(List<int> bytes, Duration duration, int canId) {
@@ -346,18 +346,16 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     ].join(', ');
 
     return [
-      //'CH0', // Channel COMMENTED OUT 
+      //'CH0', // Channel COMMENTED OUT
       canId.toRadixString(16).padLeft(8, '0'), // Proper dynamic CAN ID
 
       '8', // DLC
       dataString, // Data payload
       formattedTime, // Timestamp
       'TX', // Direction
-     pressed.isEmpty ? 'No buttons pressed' : pressed,
+      pressed.isEmpty ? 'No buttons pressed' : pressed,
     ];
-    
   }
-  
 
   int _getCurrentCanId() {
     // If any 2x2 key is pressed, return 0x195
@@ -372,49 +370,42 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     return 0x000;
   }
 
-  void _startLiveFeed() {
-    _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final now = DateTime.now();
-      final elapsed = now.difference(firstButtonPressTime ?? now);
+void _startLiveFeed() {
+  _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    final now = DateTime.now();
+    final elapsed = now.difference(firstButtonPressTime ?? now);
 
-      final hasAnyPressed = keypad2x2.any((k) => buttonStates[k] == true) ||
-          keypad2x6.any((k) => buttonStates[k] == true);
-      if (!hasAnyPressed) return;
+    final bytes = getByteValues(); // returns either dataBytes or [0,0,0,0,0,0,0,0]
+    final canId = _getCurrentCanId(); // returns either 0x195, 0x1A5, or 0x000
+    final frame = createCanFrame(bytes, elapsed, canId);
 
-      final bytes = getByteValues();
-      // Skip if no button is pressed (prevents spamming 'No buttons pressed')
-      if (!buttonStates.values.any((v) => v == true)) return;
+    final logEntry = CanLogEntry(
+      channel: 'CH0',
+      canId: frame[0],
+      dlc: frame[1],
+      data: frame[2],
+      time: frame[3],
+      dir: frame[4],
+      button: frame[5],
+    );
 
-    //  Only build a frame if buttons are pressed
-      final frame = createCanFrame(bytes, elapsed, _getCurrentCanId());
+    sharedCanLog.add(logEntry);
 
-      final key = '${frame[3]}|${frame[6]}';
-      fixedCanHistoryMap[key] = frame;
-
-      sharedCanLog.add(
-        CanLogEntry(
-          channel: frame[0],
-          canId: frame[1],
-          dlc: frame[2],
-          data: frame[3],
-          time: frame[4],
-          dir: frame[5],
-          button: frame[6],
+    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+      CanBluetooth.instance.sendCANMessage(
+        CanBluetooth.instance.connectedDevices.keys.first,
+        BlueMessage(
+          data: bytes,
+          identifier: 0x0CFF0171,
+          flagged: true,
         ),
       );
+    }
 
-      if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-        CanBluetooth.instance.sendCANMessage(
-          CanBluetooth.instance.connectedDevices.keys.first,
-          BlueMessage(
-            data: bytes,
-            identifier: 0x0CFF0171,
-            flagged: true,
-          ),
-        );
-      }
-    });
-  }
+    setState(() {}); // Refresh UI
+  });
+}
+
 
   // Returns the name of the currently connected Bluetooth device (or fallback)
   String get connectedDeviceName {
@@ -797,8 +788,11 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .toUpperCase();
 
       canId = '00000195';
-      buttonExplanation =
-          buttonStates[label] == true ? '$label pressed' : '$label released';
+      final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
+      buttonExplanation = combo.isEmpty
+          ? 'No buttons pressed'
+          : combo.join(', ') +
+              (buttonStates[label]! ? ' pressed' : ' released');
     } else if (buttonBitMap.containsKey(label)) {
       // For 2x6 functional PKP2600
       formattedData = dataBytes
@@ -807,8 +801,11 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
           .toUpperCase();
 
       canId = '000001A5';
-      buttonExplanation =
-          buttonStates[label] == true ? '$label pressed' : '$label released';
+      final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
+      buttonExplanation = combo.isEmpty
+          ? 'No buttons pressed'
+          : combo.join(', ') +
+              (buttonStates[label]! ? ' pressed' : ' released');
     } else {
       // Fallback
       formattedData = List.filled(8, 0)
@@ -1096,7 +1093,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 4),
 
         // Scrollable log area
