@@ -1,3 +1,7 @@
+//NEW JUNE 10TH - //INSTEAD OF EXTENDED ID MAKE SURE TO CHANGE TO STANDARD
+// NEW JUNE 10TH - COMPRESSED SERVICE TOOL FILE FOR THE TESTING OF THE KEYPAD STATES
+//NEW JUNE 10TH COMBO TESTS FOR THE 2X6 KEYPAD
+//JUNE 10TH CAN BOTH TESTS RUN TOGEHTER???
 //PROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID
 
 //Keypad 2x2 and keypad 2x6 official application
@@ -54,6 +58,7 @@ class BMKeypadScreen extends StatefulWidget {
 }
 
 class _BMKeypadScreenState extends State<BMKeypadScreen> {
+  Timer? _autoTestTimer;
   String getPressed2x2Buttons() {
     final pressed = keypad2x2.where((k) => buttonStates[k] == true).toList();
     return pressed.isEmpty ? 'None' : pressed.join(', ');
@@ -77,51 +82,45 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
   void _sendLastRawFrame() {
     if (sharedCanLog.isEmpty) {
-      //Add \u274c for logo
       debugPrint("No frame in log to send.");
       return;
     }
 
     final lastEntry = sharedCanLog.last;
 
-    // Parse CAN ID
-    final canId = int.tryParse(lastEntry.canId, radix: 16);
+    // Clean CAN ID to avoid padded extended formatting
+    final rawId = lastEntry.canId.replaceAll(RegExp('^0+'), '');
+    final canId = int.tryParse(rawId, radix: 16);
     if (canId == null) {
-      debugPrint("\u274c Invalid CAN ID format.");
+      debugPrint("Invalid CAN ID format.");
       return;
     }
 
-    // Parse data bytes
     final dataBytes = lastEntry.data
         .split(' ')
         .map((hex) => int.tryParse(hex, radix: 16) ?? 0)
         .toList();
 
     if (dataBytes.length != 8) {
-      //add \u274c infront for logo opt
       debugPrint("Frame must be exactly 8 bytes.");
       return;
     }
 
     final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
     if (deviceId == null) {
-      //Add \u274c infront for logo opt
-      debugPrint("No connected Bluetooth device.");
+      debugPrint(" No connected Bluetooth device.");
       return;
     }
-    // Represents a single CAN frame message to be sent over Bluetooth
-    // Includes the CAN identifier, 8-byte payload, and a flag
+
     final message = BlueMessage(
-      identifier: canId,
+      identifier: canId, // Now clean and 11-bit
       data: dataBytes,
       flagged: true,
     );
 
     CanBluetooth.instance.sendCANMessage(deviceId, message);
     debugPrint(
-      //Add \u2705 infront for logo (opt)
-      // Formats the CAN ID as an 8-character zero-padded hexadecimal string (e.g., 00000180)
-      "Sent raw frame from log: ID=\${canId.toRadixString(16).padLeft(8, '0')} DATA=\${dataBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}",
+      "Sent raw frame from log: ID=${canId.toRadixString(16).padLeft(3, '0').toUpperCase()} DATA=${dataBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ')}",
     );
   }
 
@@ -229,7 +228,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
       // Send Cleared Frame PKP2200
       final clearedFrame = BlueMessage(
-        identifier: 0x00000195,
+        identifier: 0x195,
         data: List.filled(8, 0x00),
         flagged: true,
       );
@@ -257,48 +256,56 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
       // Send LED Frame over Bluetooth
       final ledFrame = BlueMessage(
-        identifier: 0x00000195,
+        identifier: 0x195,
         data: [0x0F, 0x0F, 0x0F, 0x0F, 0x00, 0x00, 0x00, 0x00],
         flagged: true,
       );
       CanBluetooth.instance.sendCANMessage(deviceId, ledFrame);
     });
   }
-
-  void _startAutoTest() async {
-    final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
-    if (deviceId == null) {
-      debugPrint('No Bluetooth device connected for test.');
-      return;
-    }
-
-    final allKeys = [...keypad2x2, ...keypad2x6];
-    int initialFrameCount = sharedCanLog.length;
-
-    debugPrint('Auto Test started with delay $_autoTestDelayMs ms');
-
-    // PRESS phase — one by one
-    for (String key in allKeys) {
-      setState(() => _currentTestKey = key);
-      _handleButtonPress(key);
-      await Future.delayed(Duration(milliseconds: _autoTestDelayMs));
-    }
-
-    // Wait briefly before clearing
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // BULK DESELECT: like pressing "Reset All"
-    _resetAllButtons();
-
-    setState(() => _currentTestKey = null);
-    /*
-    // Show completion result
-    final newFrames = sharedCanLog.length - initialFrameCount;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Auto Test complete: $newFrames frames sent')),
-    );
-    */
+void _startAutoTest() async {
+  final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
+  if (deviceId == null) {
+    debugPrint('No Bluetooth device connected for test.');
+    return;
   }
+
+  final allKeys = [...keypad2x2, ...keypad2x6];
+
+  debugPrint('Auto Test started with delay $_autoTestDelayMs ms');
+
+  for (String key in allKeys) {
+    setState(() => _currentTestKey = key);
+
+    // Press
+    _handleButtonPress(key);
+
+    // Wait
+    await Future.delayed(Duration(milliseconds: _autoTestDelayMs));
+
+    // Release silently (without logging)
+    buttonStates[key] = false;
+
+    // Also clear bytes
+    if (buttonBitMap.containsKey(key)) {
+      final byteIndex = buttonBitMap[key]![0];
+      final bitIndex = buttonBitMap[key]![1];
+      dataBytes[byteIndex] &= ~(1 << bitIndex);
+    }
+
+    if (ledButtonMap.containsKey(key)) {
+      final byteIndex = ledButtonMap[key]![0];
+      final bitIndex = ledButtonMap[key]![1];
+      ledBytes[byteIndex] &= ~(1 << bitIndex);
+    }
+
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+
+  setState(() => _currentTestKey = null);
+}
+
+
 
   //Clears only 2x6 keypad and logs
   void _clear2x6Buttons() {
@@ -370,42 +377,42 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     return 0x000;
   }
 
-void _startLiveFeed() {
-  _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-    final now = DateTime.now();
-    final elapsed = now.difference(firstButtonPressTime ?? now);
+  void _startLiveFeed() {
+    _liveCanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final now = DateTime.now();
+      final elapsed = now.difference(firstButtonPressTime ?? now);
 
-    final bytes = getByteValues(); // returns either dataBytes or [0,0,0,0,0,0,0,0]
-    final canId = _getCurrentCanId(); // returns either 0x195, 0x1A5, or 0x000
-    final frame = createCanFrame(bytes, elapsed, canId);
+      final bytes =
+          getByteValues(); // returns either dataBytes or [0,0,0,0,0,0,0,0]
+      final canId = _getCurrentCanId(); // returns either 0x195, 0x1A5, or 0x000
+      final frame = createCanFrame(bytes, elapsed, canId);
 
-    final logEntry = CanLogEntry(
-      channel: 'CH0',
-      canId: frame[0],
-      dlc: frame[1],
-      data: frame[2],
-      time: frame[3],
-      dir: frame[4],
-      button: frame[5],
-    );
-
-    sharedCanLog.add(logEntry);
-
-    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-      CanBluetooth.instance.sendCANMessage(
-        CanBluetooth.instance.connectedDevices.keys.first,
-        BlueMessage(
-          data: bytes,
-          identifier: 0x0CFF0171,
-          flagged: true,
-        ),
+      final logEntry = CanLogEntry(
+        channel: 'CH0',
+        canId: frame[0],
+        dlc: frame[1],
+        data: frame[2],
+        time: frame[3],
+        dir: frame[4],
+        button: frame[5],
       );
-    }
 
-    setState(() {}); // Refresh UI
-  });
-}
+      sharedCanLog.add(logEntry);
 
+      if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+        CanBluetooth.instance.sendCANMessage(
+          CanBluetooth.instance.connectedDevices.keys.first,
+          BlueMessage(
+            data: bytes,
+            identifier: 0x0CFF0171,
+            flagged: true,
+          ),
+        );
+      }
+
+      setState(() {}); // Refresh UI
+    });
+  }
 
   // Returns the name of the currently connected Bluetooth device (or fallback)
   String get connectedDeviceName {
@@ -698,7 +705,7 @@ void _startLiveFeed() {
   }
 
   //Added for testing
-  int _autoTestDelayMs = 400; // Default: Normal speed
+  int _autoTestDelayMs = 1000; // Default: Normal speed
   String? _currentTestKey; // Used to highlight the active button
 
   //final List<CanLogEntry> canFrameLog = [];
@@ -1601,9 +1608,10 @@ void _startLiveFeed() {
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
                               onPressed: () {
-                                if (!_autoTestHasRun) {
-                                  _autoTestHasRun = true;
+                                if (_autoTestTimer == null) {
                                   _startAutoTest();
+                                } else {
+                                  debugPrint(" Auto test is already running.");
                                 }
                               },
                               icon: const Icon(Icons.play_circle_fill),
@@ -1745,7 +1753,7 @@ void _startLiveFeed() {
       CanBluetooth.instance.sendCANMessage(
         CanBluetooth.instance.connectedDevices.keys.first,
         BlueMessage(
-          identifier: 0x000001A5,
+          identifier: 0x1A5,
           data: dataBytes,
           flagged: true,
         ),
@@ -1773,7 +1781,7 @@ void _startLiveFeed() {
     CanBluetooth.instance.sendCANMessage(
       deviceId,
       BlueMessage(
-        identifier: 0x00000195,
+        identifier: 0x195,
         data: ledFrameData,
         flagged: true,
       ),

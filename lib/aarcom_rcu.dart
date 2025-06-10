@@ -11,6 +11,8 @@ import 'globals.dart';
 import 'can_log_entry.dart';
 import 'shared_widgets.dart';
 
+
+//INSTEAD OF EXTENDED ID MAKE SURE TO CHANGE TO STANDARD
 //REMOVE VIBRATOR BECAUSE WE USED IT FROM ANOTHER
 // Represents a single CAN frame entry in the log.
 // Used to encapsulate metadata like ID, DLC, data payload, and timestamp.
