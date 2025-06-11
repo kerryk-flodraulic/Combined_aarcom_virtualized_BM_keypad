@@ -123,53 +123,54 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       "Sent raw frame from log: ID=${canId.toRadixString(16).padLeft(3, '0').toUpperCase()} DATA=${dataBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ')}",
     );
   }
-void _runComboTest() async {
-  final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
-  if (deviceId == null) {
-    debugPrint('No device connected for combo test.');
-    return;
-  }
 
-  const int comboIterations = 10;
-
-  for (int i = 0; i < comboIterations; i++) {
-    // Pick 3–5 random 2x6 keys
-    final random = keypad2x6.toList()..shuffle();
-    final comboKeys = random.take(3 + i % 3).toList(); // 3–5 buttons
-
-    debugPrint('Combo $i: ${comboKeys.join(', ')}');
-
-    // Press all selected keys
-    for (final key in comboKeys) {
-      if (!buttonStates[key]!) {
-        _handleButtonPress(key); // press & log
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
+  void _runComboTest() async {
+    final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
+    if (deviceId == null) {
+      debugPrint('No device connected for combo test.');
+      return;
     }
 
-    // Hold them briefly
-    await Future.delayed(const Duration(milliseconds: 800));
+    const int comboIterations = 10;
 
-    // Release all keys silently (no log)
-    for (final key in comboKeys) {
-      buttonStates[key] = false;
+    for (int i = 0; i < comboIterations; i++) {
+      // Pick 3–5 random 2x6 keys
+      final random = keypad2x6.toList()..shuffle();
+      final comboKeys = random.take(3).toList();
 
-      // Clear bits
-      if (buttonBitMap.containsKey(key)) {
-        final byteIndex = buttonBitMap[key]![0];
-        final bitIndex = buttonBitMap[key]![1];
-        dataBytes[byteIndex] &= ~(1 << bitIndex);
+      debugPrint('Combo $i: ${comboKeys.join(', ')}');
+
+      // Press all selected keys
+      for (final key in comboKeys) {
+        if (!buttonStates[key]!) {
+          _handleButtonPress(key); // press & log
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       }
+
+      // Hold them briefly
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Release all keys silently (no log)
+      for (final key in comboKeys) {
+        buttonStates[key] = false;
+
+        // Clear bits
+        if (buttonBitMap.containsKey(key)) {
+          final byteIndex = buttonBitMap[key]![0];
+          final bitIndex = buttonBitMap[key]![1];
+          dataBytes[byteIndex] &= ~(1 << bitIndex);
+        }
+      }
+
+      // Send cleared frame (optional)
+      _sendFunctionFrame();
+
+      await Future.delayed(const Duration(milliseconds: 300));
     }
 
-    // Send cleared frame (optional)
-    _sendFunctionFrame();
-
-    await Future.delayed(const Duration(milliseconds: 300));
+    debugPrint('Combo test completed.');
   }
-
-  debugPrint('Combo test completed.');
-}
 
   bool _isDarkMode = true;
   bool _autoScrollEnabled = true;
@@ -199,34 +200,28 @@ void _runComboTest() async {
     'F12',
   ];
 
-
-
   // NEW BITMAP:
-final Map<String, List<int>> buttonBitMap = {
-  'K1': [0, 0], // Byte 0, Bit 0
-  'K2': [0, 1],
-  'K3': [0, 2],
-  'K4': [0, 3],
-};
+  final Map<String, List<int>> buttonBitMap = {
+    'K1': [0, 0], 
+    'K2': [0, 1],
+    'K3': [0, 2],
+    'K4': [0, 3],
+  };
 
-
-final Map<String, List<int>> ledButtonMap = {
-  'F1': [0, 0],
-  'F2': [0, 1],
-  'F3': [0, 2],
-  'F4': [0, 3],
-  'F5': [0, 4],
-  'F6': [0, 5],
-  'F7': [0, 6], 
-  'F8': [0, 7],
-  'F9': [1, 0],   
-  'F10': [1, 1],
-  'F11': [1, 2],
-  'F12': [1, 3],
-};
-
-
-
+  final Map<String, List<int>> ledButtonMap = {
+    'F1': [0, 0],
+    'F2': [0, 1],
+    'F3': [0, 2],
+    'F4': [0, 3],
+    'F5': [0, 4],
+    'F6': [0, 5],
+    'F7': [0, 6],
+    'F8': [0, 7],
+    'F9': [1, 0],
+    'F10': [1, 1],
+    'F11': [1, 2],
+    'F12': [1, 3],
+  };
 
   //Reset all buttons and Led Data bytes
   void _resetAllButtons() {
@@ -290,49 +285,48 @@ final Map<String, List<int>> ledButtonMap = {
       CanBluetooth.instance.sendCANMessage(deviceId, ledFrame);
     });
   }
-void _startAutoTest() async {
-  final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
-  if (deviceId == null) {
-    debugPrint('No Bluetooth device connected for test.');
-    return;
-  }
 
-  final allKeys = [...keypad2x2, ...keypad2x6];
-
-  debugPrint('Auto Test started with delay $_autoTestDelayMs ms');
-
-  for (String key in allKeys) {
-    setState(() => _currentTestKey = key);
-
-    // Press
-    _handleButtonPress(key);
-
-    // Wait
-    await Future.delayed(Duration(milliseconds: _autoTestDelayMs));
-
-    // Release silently (without logging)
-    buttonStates[key] = false;
-
-    // Also clear bytes
-    if (buttonBitMap.containsKey(key)) {
-      final byteIndex = buttonBitMap[key]![0];
-      final bitIndex = buttonBitMap[key]![1];
-      dataBytes[byteIndex] &= ~(1 << bitIndex);
+  void _startAutoTest() async {
+    final deviceId = CanBluetooth.instance.connectedDevices.keys.firstOrNull;
+    if (deviceId == null) {
+      debugPrint('No Bluetooth device connected for test.');
+      return;
     }
 
-    if (ledButtonMap.containsKey(key)) {
-      final byteIndex = ledButtonMap[key]![0];
-      final bitIndex = ledButtonMap[key]![1];
-      ledBytes[byteIndex] &= ~(1 << bitIndex);
+    final allKeys = [...keypad2x2, ...keypad2x6];
+
+    debugPrint('Auto Test started with delay $_autoTestDelayMs ms');
+
+    for (String key in allKeys) {
+      setState(() => _currentTestKey = key);
+
+      // Press
+      _handleButtonPress(key);
+
+      // Wait
+      await Future.delayed(Duration(milliseconds: _autoTestDelayMs));
+
+      // Release silently (without logging)
+      buttonStates[key] = false;
+
+      // Also clear bytes
+      if (buttonBitMap.containsKey(key)) {
+        final byteIndex = buttonBitMap[key]![0];
+        final bitIndex = buttonBitMap[key]![1];
+        dataBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+
+      if (ledButtonMap.containsKey(key)) {
+        final byteIndex = ledButtonMap[key]![0];
+        final bitIndex = ledButtonMap[key]![1];
+        ledBytes[byteIndex] &= ~(1 << bitIndex);
+      }
+
+      await Future.delayed(const Duration(milliseconds: 200));
     }
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    setState(() => _currentTestKey = null);
   }
-
-  setState(() => _currentTestKey = null);
-}
-
-
 
   //Clears only 2x6 keypad and logs
   void _clear2x6Buttons() {
@@ -1648,22 +1642,18 @@ void _startAutoTest() async {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 10),
                               ),
-
-                              
                             ),
-
                             const SizedBox(width: 16),
-ElevatedButton.icon(
-  onPressed: _runComboTest,
-  icon: const Icon(Icons.shuffle),
-  label: const Text('Run Combo Test'),
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.deepPurple.shade700,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-  ),
-),
-
-                            
+                            ElevatedButton.icon(
+                              onPressed: _runComboTest,
+                              icon: const Icon(Icons.shuffle),
+                              label: const Text('Run Combo Test'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple.shade700,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
+                            ),
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
                               onPressed: _resetTimerOnly,
@@ -1805,42 +1795,72 @@ void _sendFunctionFrame() {
 
 */
 
+  void _sendFunctionFrame() {
+    // Explicitly update buttonStates from 2x6 bits for Fixed Feed to recognize them
+  buttonStates.updateAll((key, value) => false); // Reset all to false
 
+// Recalculate active buttons from dataBytes bits
+    buttonBitMap.forEach((key, pos) {
+      final byte = dataBytes[pos[0]];
+      final isPressed = (byte & (1 << pos[1])) != 0;
+      if (isPressed) buttonStates[key] = true;
+    });
 
+    // Reset 8-byte array
+    dataBytes = List.filled(8, 0);
 
-void _sendFunctionFrame() {
-  //  Reset 8-byte array
-  dataBytes = List.filled(8, 0);
+    // Fill bits for KP2x2 buttons (K1–K4)
+    ledButtonMap.forEach((key, pos) {
+      if (buttonStates[key] == true) {
+        dataBytes[pos[0]] |= (1 << pos[1]);
+      }
+    });
 
-  //  Fill bits for KP2x2 buttons (K1–K4)
-  ledButtonMap.forEach((key, pos) {
-    if (buttonStates[key] == true) {
-      dataBytes[pos[0]] |= (1 << pos[1]);
+    // Fill bits for KP2x6 buttons (F1–F12)
+    buttonBitMap.forEach((key, pos) {
+      if (buttonStates[key] == true) {
+        dataBytes[pos[0]] |= (1 << pos[1]);
+      }
+    });
+
+    final pressedButtons = buttonStates.entries
+        .where((e) => e.value == true)
+        .map((e) => e.key)
+        .toList();
+
+    final buttonExplanation = pressedButtons.isEmpty
+        ? 'No buttons pressed'
+        : pressedButtons.join(', ');
+
+    // Generate a frame key to store fixed log (you may already have this logic elsewhere)
+    final formattedData = dataBytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+        .join(' ');
+    final frameKey =
+        formattedData + '_1A5'; // or whatever logic you use to make frameKey
+
+    fixedCanHistoryMap[frameKey] = [
+      'CH0',
+      '1A5',
+      '8',
+      formattedData,
+      (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+      'TX',
+      buttonExplanation,
+    ];
+
+    // Send frame if connected
+    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+      CanBluetooth.instance.sendCANMessage(
+        CanBluetooth.instance.connectedDevices.keys.first,
+        BlueMessage(
+          identifier: 0x1A5,
+          data: dataBytes,
+          flagged: true,
+        ),
+      );
     }
-  });
-
-  //  Fill bits for KP2x6 buttons (F1–F12)
-  buttonBitMap.forEach((key, pos) {
-    if (buttonStates[key] == true) {
-      dataBytes[pos[0]] |= (1 << pos[1]);
-    }
-  });
-
-  //  Send frame if connected
-  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-    CanBluetooth.instance.sendCANMessage(
-      CanBluetooth.instance.connectedDevices.keys.first,
-      BlueMessage(
-        identifier: 0x1A5, // or 0x195 if sending KP2x2 separately
-        data: dataBytes,
-        flagged: true,
-      ),
-    );
   }
-}
-
-
-
 
   void _sendLEDFrame() {
     if (CanBluetooth.instance.connectedDevices.isEmpty) return;
