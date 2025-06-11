@@ -1,8 +1,8 @@
-//NEW JUNE 10TH - //INSTEAD OF EXTENDED ID MAKE SURE TO CHANGE TO STANDARD
+//XNEW JUNE 10TH - //INSTEAD OF EXTENDED ID MAKE SURE TO CHANGE TO STANDARD
 // NEW JUNE 10TH - COMPRESSED SERVICE TOOL FILE FOR THE TESTING OF THE KEYPAD STATES
-//NEW JUNE 10TH COMBO TESTS FOR THE 2X6 KEYPAD
+//XNEW JUNE 10TH COMBO TESTS FOR THE 2X6 KEYPAD
 //JUNE 10TH CAN BOTH TESTS RUN TOGEHTER???
-//PROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID
+//XPROBLEM IN CODE: WHEN 2X2 BUTTON K1 IS PRESSED IN THE LIVE FEED IT IS LOGGING TWO DIFFERENT ENTERIES ONE WITH CHO WHICH IS VALID AND A REPEAT WITH 1 WHICH IS NOT VALID
 
 //Keypad 2x2 and keypad 2x6 official application
 
@@ -199,54 +199,34 @@ void _runComboTest() async {
     'F12',
   ];
 
-  /*
-  // Maps 2x2 keys (PKP2200) to LED control byte/bit positions in CAN frames
-  final Map<String, List<int>> ledButtonMap = {
-    'K1': [0, 0],
-    'K2': [0, 1],
-    'K3': [0, 2],
-    'K4': [0, 3],
-  };
-  // Maps 2x6 keys (PKP2600) to data byte/bit positions for functional control
-  final Map<String, List<int>> buttonBitMap = {
-    'F1': [0, 0],
-    'F2': [0, 1],
-    'F3': [0, 2],
-    'F4': [0, 3],
-    'F5': [0, 4],
-    'F6': [0, 5],
-    'F7': [1, 0],
-    'F8': [1, 1],
-    'F9': [1, 2],
-    'F10': [1, 3],
-    'F11': [1, 4],
-    'F12': [1, 5],
-  };
-  */
+
 
   // NEW BITMAP:
+final Map<String, List<int>> buttonBitMap = {
+  'K1': [0, 0], // Byte 0, Bit 0
+  'K2': [0, 1],
+  'K3': [0, 2],
+  'K4': [0, 3],
+};
 
-  final Map<String, List<int>> ledButtonMap = {
-    'K1': [0, 0], // Bit 0
-    'K2': [0, 1], // Bit 1
-    'K3': [0, 2], // Bit 2
-    'K4': [0, 3], // Bit 3
-  };
 
-  final Map<String, List<int>> buttonBitMap = {
-    'F1': [0, 0],
-    'F2': [0, 1],
-    'F3': [0, 2],
-    'F4': [0, 3],
-    'F5': [0, 4],
-    'F6': [0, 5],
-    'F7': [0, 6],
-    'F8': [0, 7],
-    'F9': [1, 0],
-    'F10': [1, 1],
-    'F11': [1, 2],
-    'F12': [1, 3],
-  };
+final Map<String, List<int>> ledButtonMap = {
+  'F1': [0, 0],
+  'F2': [0, 1],
+  'F3': [0, 2],
+  'F4': [0, 3],
+  'F5': [0, 4],
+  'F6': [0, 5],
+  'F7': [0, 6], 
+  'F8': [0, 7],
+  'F9': [1, 0],   
+  'F10': [1, 1],
+  'F11': [1, 2],
+  'F12': [1, 3],
+};
+
+
+
 
   //Reset all buttons and Led Data bytes
   void _resetAllButtons() {
@@ -445,7 +425,7 @@ void _startAutoTest() async {
       );
 
       sharedCanLog.add(logEntry);
-
+/*
       if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
         CanBluetooth.instance.sendCANMessage(
           CanBluetooth.instance.connectedDevices.keys.first,
@@ -456,7 +436,7 @@ void _startAutoTest() async {
           ),
         );
       }
-
+*/
       setState(() {}); // Refresh UI
     });
   }
@@ -828,7 +808,7 @@ void _startAutoTest() async {
         0x00,
         0x00,
         0x00,
-        _nextTickByte(), // Use the updated tick generator
+        _nextTickByte(), // Use the updated tick generator(FROM DOC)
         0x00,
         0x00,
         0x00
@@ -1808,20 +1788,59 @@ ElevatedButton.icon(
       ),
     );
   }
-
-//NEW BITMAP
-  void _sendFunctionFrame() {
-    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-      CanBluetooth.instance.sendCANMessage(
-        CanBluetooth.instance.connectedDevices.keys.first,
-        BlueMessage(
-          identifier: 0x1A5,
-          data: dataBytes,
-          flagged: true,
-        ),
-      );
-    }
+/*
+void _sendFunctionFrame() {
+  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+    CanBluetooth.instance.sendCANMessage(
+      CanBluetooth.instance.connectedDevices.keys.first,
+      BlueMessage(
+        identifier: 0x1A5,
+        data: dataBytes,
+        flagged: true,
+      ),
+    );
   }
+}
+
+
+*/
+
+
+
+
+void _sendFunctionFrame() {
+  //  Reset 8-byte array
+  dataBytes = List.filled(8, 0);
+
+  //  Fill bits for KP2x2 buttons (K1–K4)
+  ledButtonMap.forEach((key, pos) {
+    if (buttonStates[key] == true) {
+      dataBytes[pos[0]] |= (1 << pos[1]);
+    }
+  });
+
+  //  Fill bits for KP2x6 buttons (F1–F12)
+  buttonBitMap.forEach((key, pos) {
+    if (buttonStates[key] == true) {
+      dataBytes[pos[0]] |= (1 << pos[1]);
+    }
+  });
+
+  //  Send frame if connected
+  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+    CanBluetooth.instance.sendCANMessage(
+      CanBluetooth.instance.connectedDevices.keys.first,
+      BlueMessage(
+        identifier: 0x1A5, // or 0x195 if sending KP2x2 separately
+        data: dataBytes,
+        flagged: true,
+      ),
+    );
+  }
+}
+
+
+
 
   void _sendLEDFrame() {
     if (CanBluetooth.instance.connectedDevices.isEmpty) return;
