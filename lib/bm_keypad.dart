@@ -69,6 +69,31 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     return keys.isEmpty ? 'None' : keys.join(', ');
   }
 
+  /*
+int _comboSize = 1;
+List<String> _comboSelection = [];
+ Set<String> _customCombo = {};
+*/
+  Set<String> _customCombo = {};
+  int _comboSize = 1;
+  List<String?> _comboDropdownValues =
+      List.filled(1, null); // Tracks selected button labels
+  final List<String> _allButtons = ['K1', 'K2', 'K3', 'K4'] +
+      [
+        'F1',
+        'F2',
+        'F3',
+        'F4',
+        'F5',
+        'F6',
+        'F7',
+        'F8',
+        'F9',
+        'F10',
+        'F11',
+        'F12'
+      ];
+
   bool _showFixedFeed = false;
   Map<String, List<String>> fixedCanHistoryMap = {};
 
@@ -79,6 +104,81 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
   Timer? _liveCanTimer;
   DateTime? firstButtonPressTime;
+  void _sendCustomCombo() {
+    // Reset all states
+    buttonStates.updateAll((key, value) => false);
+    dataBytes = List.filled(8, 0);
+    ledBytes = List.filled(8, 0);
+
+    for (final label in _customCombo) {
+      buttonStates[label] = true;
+      if (buttonBitMap.containsKey(label)) {
+        final pos = buttonBitMap[label]!;
+        dataBytes[pos[0]] |= (1 << pos[1]);
+      }
+      if (ledButtonMap.containsKey(label)) {
+        final pos = ledButtonMap[label]!;
+        ledBytes[pos[0]] |= (1 << pos[1]);
+      }
+    }
+
+    // Use tick for 2x2 only
+    if (_customCombo.any((k) => keypad2x2.contains(k))) {
+      dataBytes[4] = _nextTickByte();
+    }
+
+    final formattedData = dataBytes
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join(' ')
+        .toUpperCase();
+
+    final buttonExplanation =
+        _customCombo.isEmpty ? 'No buttons pressed' : _customCombo.join(', ');
+
+    final entry = CanLogEntry(
+      channel: 'CH0',
+      canId: _customCombo.any((k) => keypad2x2.contains(k))
+          ? '00000195'
+          : '000001A5',
+      dlc: '8',
+      data: formattedData,
+      dir: 'TX',
+      time: _elapsedFormatted,
+      button: buttonExplanation,
+    );
+
+    sharedCanLog.add(entry);
+
+    if (!buttonExplanation.contains("No buttons pressed")) {
+      final frameKey = '$formattedData|$buttonExplanation';
+      fixedCanHistoryMap[frameKey] = [
+        'CH0',
+        entry.canId,
+        '8',
+        formattedData,
+        (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+        'TX',
+        buttonExplanation,
+      ];
+    }
+    if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
+      final deviceId = CanBluetooth.instance.connectedDevices.keys.first;
+      final message = BlueMessage(
+        identifier: int.parse(entry.canId, radix: 16),
+        data: dataBytes,
+        flagged: true,
+      );
+
+      debugPrint('Sending BlueMessage: $message to $deviceId');
+
+      CanBluetooth.instance.sendCANMessage(
+        deviceId,
+        message,
+      );
+    }
+
+    setState(() {});
+  }
 
   void _sendLastRawFrame() {
     if (sharedCanLog.isEmpty) {
@@ -375,7 +475,10 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
     return [
       //'CH0', // Channel COMMENTED OUT
-     canId.toRadixString(16).padLeft(8, '0').toUpperCase(), // Proper dynamic CAN ID
+      canId
+          .toRadixString(16)
+          .padLeft(8, '0')
+          .toUpperCase(), // Proper dynamic CAN ID
 
       '8', // DLC
       dataString, // Data payload
@@ -787,61 +890,55 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     String canId;
     String buttonExplanation;
 
-   if (ledButtonMap.containsKey(label)) {
-  final byteIndex = ledButtonMap[label]![0];
-  final bitIndex = ledButtonMap[label]![1];
+    if (ledButtonMap.containsKey(label)) {
+      final byteIndex = ledButtonMap[label]![0];
+      final bitIndex = ledButtonMap[label]![1];
 
-  if (buttonStates[label] == true) {
-    ledBytes[byteIndex] |= (1 << bitIndex);
-  } else {
-    ledBytes[byteIndex] &= ~(1 << bitIndex);
-  }
+      if (buttonStates[label] == true) {
+        ledBytes[byteIndex] |= (1 << bitIndex);
+      } else {
+        ledBytes[byteIndex] &= ~(1 << bitIndex);
+      }
 
-  List<int> keyStateMessage = [
-    ledBytes[0],
-    0x00,
-    0x00,
-    0x00,
-   // _nextTickByte(), // Use the updated tick generator(FROM DOC)
-    0x00,
-    0x00,
-    0x00,
-    0x00
-  ];
+      List<int> keyStateMessage = [
+        ledBytes[0],
+        0x00,
+        0x00,
+        0x00,
+        // _nextTickByte(), // Use the updated tick generator(FROM DOC)
+        0x00,
+        0x00,
+        0x00,
+        0x00
+      ];
 
-  _sendLEDFrame(); // Send over Bluetooth
+      _sendLEDFrame(); // Send over Bluetooth
 
-  formattedData = keyStateMessage
-      .map((b) => b.toRadixString(16).padLeft(2, '0'))
-      .join(' ')
-      .toUpperCase();
+      formattedData = keyStateMessage
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
 
-  canId = '000001A5'; 
-  final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
-  buttonExplanation = combo.isEmpty
-    ? 'No buttons pressed'
-    : combo.join(', ');
+      canId = '000001A5';
+      final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
+      buttonExplanation =
+          combo.isEmpty ? 'No buttons pressed' : combo.join(', ');
+    } else if (buttonBitMap.containsKey(label)) {
+      // For 2x2 functional PKP2200
+      // Inject tick only for 2x2 in byte 4
+      final tickedDataBytes = List<int>.from(dataBytes);
+      tickedDataBytes[4] = _nextTickByte();
 
-} else if (buttonBitMap.containsKey(label)) {
-  // For 2x2 functional PKP2200
- // Inject tick only for 2x2 in byte 4
-final tickedDataBytes = List<int>.from(dataBytes);
-tickedDataBytes[4] = _nextTickByte();
+      formattedData = tickedDataBytes
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ')
+          .toUpperCase();
 
-formattedData = tickedDataBytes
-    .map((b) => b.toRadixString(16).padLeft(2, '0'))
-    .join(' ')
-    .toUpperCase();
-
-
-  canId = '00000195'; 
-  final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
- buttonExplanation = combo.isEmpty
-    ? 'No buttons pressed'
-    : combo.join(', ');
-
-}
- else {
+      canId = '00000195';
+      final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
+      buttonExplanation =
+          combo.isEmpty ? 'No buttons pressed' : combo.join(', ');
+    } else {
       // Fallback
       formattedData = List.filled(8, 0)
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -859,24 +956,22 @@ formattedData = tickedDataBytes
       data: formattedData,
       dir: 'TX',
       time: _elapsedFormatted,
-
       button: buttonExplanation,
     );
 
-    // Log to Fixed Feed 
-if (!buttonExplanation.contains('No buttons pressed')) {
-  final frameKey = '$formattedData|$buttonExplanation';
-  fixedCanHistoryMap[frameKey] = [
-    'CH0',
-    canId,
-    '8',
-    formattedData,
-    (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
-    'TX',
-    buttonExplanation,
-  ];
-}
-
+    // Log to Fixed Feed
+    if (!buttonExplanation.contains('No buttons pressed')) {
+      final frameKey = '$formattedData|$buttonExplanation';
+      fixedCanHistoryMap[frameKey] = [
+        'CH0',
+        canId,
+        '8',
+        formattedData,
+        (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+        'TX',
+        buttonExplanation,
+      ];
+    }
 
     setState(() {
       sharedCanLog.add(entry);
@@ -1499,6 +1594,158 @@ if (!buttonExplanation.contains('No buttons pressed')) {
                             ],
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+
+                  //UPDATED -(Pratik Req.) Build own combo section
+                  Card(
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                    color: Colors.grey.shade900,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    elevation: 6,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.auto_fix_high,
+                                    color: Colors.tealAccent),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Build Your Own Combo',
+                                  style: TextStyle(
+                                    color: Colors.tealAccent,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Combo size dropdown
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Number of buttons:',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                                const SizedBox(width: 12),
+                                DropdownButton<int>(
+                                  value: _comboSize,
+                                  dropdownColor: Colors.black,
+                                  style: const TextStyle(color: Colors.white),
+                                  items: List.generate(5, (i) => i + 1)
+                                      .map((n) => DropdownMenuItem(
+                                            value: n,
+                                            child: Text('$n'),
+                                          ))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _comboSize = val;
+                                        _comboDropdownValues =
+                                            List.filled(val, null);
+                                      });
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Dynamic dropdowns
+
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: List.generate(_comboSize, (i) {
+                                return SizedBox(
+                                  width: 160,
+                                  child: DropdownButtonFormField<String>(
+                                    value: _comboDropdownValues[i],
+                                    hint: Text('Select ${i + 1}'),
+                                    dropdownColor: Colors.black,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.grey.shade800,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    //items: _allButtons set only to 2x6
+                                    items: keypad2x6
+                                        .where((btn) =>
+                                            !_comboDropdownValues
+                                                .contains(btn) ||
+                                            _comboDropdownValues[i] == btn)
+                                        .map((label) => DropdownMenuItem(
+                                              value: label,
+                                              child: Text(label),
+                                            ))
+                                        .toList(),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _comboDropdownValues[i] = val;
+                                      });
+                                    },
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Build & Send button
+                          Align(
+                            alignment: Alignment.center,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.flash_on,
+                                  color: Colors.yellowAccent),
+                              label: const Text(
+                                'Build & Send',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.deepPurple.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 5,
+                              ),
+                              onPressed:
+                                  _comboDropdownValues.every((e) => e != null)
+                                      ? () {
+                                          _customCombo = _comboDropdownValues
+                                              .whereType<String>()
+                                              .toSet();
+                                          _sendCustomCombo();
+                                        }
+                                      : null,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
