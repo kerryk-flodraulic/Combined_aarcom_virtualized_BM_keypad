@@ -43,7 +43,7 @@ class CombinedHome extends StatelessWidget {
 
           VerticalDivider(width: 1, color: Colors.white30),
 
-          // 🟨 Right side: BM Keypad
+          //  Right side: BM Keypad
           Expanded(
             flex: 1,
             child: BMKeypadScreen(),
