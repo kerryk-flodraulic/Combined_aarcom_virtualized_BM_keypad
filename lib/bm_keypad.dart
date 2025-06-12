@@ -894,7 +894,10 @@ List<String> _comboSelection = [];
       } else {
         ledBytes[byteIndex] &= ~(1 << bitIndex);
       }
+List<int> keyStateMessage = List<int>.from(ledBytes);  // Send all 8 bytes
 
+//removed this on june 12th due to data logging error 
+/*
       List<int> keyStateMessage = [
         ledBytes[0],
         0x00,
@@ -906,7 +909,7 @@ List<String> _comboSelection = [];
         0x00,
         0x00
       ];
-
+*/
       _sendLEDFrame(); // Send over Bluetooth
 
       formattedData = keyStateMessage
@@ -2150,7 +2153,7 @@ void _sendFunctionFrame() {
 
     final ledFrameData = [
       ledBytes[0], // Byte 0
-      ledBytes[1],
+      ledBytes[1], //ACCOUNTS FOR F9-F12 
       0x00,
       0x00,
       _nextTickByte(),
