@@ -802,7 +802,8 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     0x00,
     0x00,
     0x00,
-    _nextTickByte(), // Use the updated tick generator(FROM DOC)
+   // _nextTickByte(), // Use the updated tick generator(FROM DOC)
+    0x00,
     0x00,
     0x00,
     0x00
@@ -823,10 +824,15 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
 } else if (buttonBitMap.containsKey(label)) {
   // For 2x2 functional PKP2200
-  formattedData = dataBytes
-      .map((b) => b.toRadixString(16).padLeft(2, '0'))
-      .join(' ')
-      .toUpperCase();
+ // Inject tick only for 2x2 in byte 4
+final tickedDataBytes = List<int>.from(dataBytes);
+tickedDataBytes[4] = _nextTickByte();
+
+formattedData = tickedDataBytes
+    .map((b) => b.toRadixString(16).padLeft(2, '0'))
+    .join(' ')
+    .toUpperCase();
+
 
   canId = '00000195'; 
   final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
@@ -1880,7 +1886,7 @@ void _sendFunctionFrame() {
       0x00, // Byte 1 (not used)
       0x00, // Byte 2 (not used)
       0x00, // Byte 3 (not used)
-      _nextTickByte(), // Byte 4 = tick timer
+      _nextTickByte(), // Byte 4 = tick timer removed
       0x00,
       0x00,
       0x00
