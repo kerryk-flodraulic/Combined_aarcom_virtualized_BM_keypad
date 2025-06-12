@@ -58,6 +58,8 @@ class BMKeypadScreen extends StatefulWidget {
 }
 
 class _BMKeypadScreenState extends State<BMKeypadScreen> {
+  bool _showCanFrame = true; // Toggle for showing CAN frame section
+
   Timer? _autoTestTimer;
   String getPressed2x2Buttons() {
     final pressed = keypad2x2.where((k) => buttonStates[k] == true).toList();
@@ -1779,7 +1781,29 @@ List<String> _comboSelection = [];
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _showCanFrame = !_showCanFrame;
+                              });
+                            },
+                            icon: Icon(_showCanFrame
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            label: Text(_showCanFrame
+                                ? 'Hide CAN Frame'
+                                : 'Show CAN Frame'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade800,
+                              foregroundColor: Colors.tealAccent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1976,6 +2000,7 @@ List<String> _comboSelection = [];
                                 ),
                               ),
                             ),
+                      
                           ],
                         ),
                       ],
@@ -1986,13 +2011,16 @@ List<String> _comboSelection = [];
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Card(
-                      elevation: 4,
-                      color: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    child: Visibility(
+                      visible: _showCanFrame,
+                      child: Card(
+                        elevation: 4,
+                        color: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: SizedBox(height: 260, child: buildCanLogTable()),
                       ),
-                      child: SizedBox(height: 260, child: buildCanLogTable()),
                     ),
                   ),
                 ],
