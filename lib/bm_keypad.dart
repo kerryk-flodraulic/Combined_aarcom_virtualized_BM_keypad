@@ -857,17 +857,20 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       button: buttonExplanation,
     );
 
-    // Log to Fixed Feed as well
-    final frameKey = '$formattedData|$buttonExplanation';
-    fixedCanHistoryMap[frameKey] = [
-      'CH0',
-      canId,
-      '8',
-      formattedData,
-      (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
-      'TX',
-      buttonExplanation,
-    ];
+    // Log to Fixed Feed 
+if (!buttonExplanation.contains('No buttons pressed')) {
+  final frameKey = '$formattedData|$buttonExplanation';
+  fixedCanHistoryMap[frameKey] = [
+    'CH0',
+    canId,
+    '8',
+    formattedData,
+    (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+    'TX',
+    buttonExplanation,
+  ];
+}
+
 
     setState(() {
       sharedCanLog.add(entry);
