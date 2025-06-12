@@ -841,6 +841,9 @@ List<String> _comboSelection = [];
   void _handleButtonPress(String label) {
     label = label.toUpperCase().trim();
 
+    print(
+        'Pressed $label — Data: ${dataBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+
     HapticFeedback.lightImpact();
     final elapsed = _stopwatch.elapsed;
     final timestamp =
@@ -848,7 +851,6 @@ List<String> _comboSelection = [];
 
     // Toggle the state
     buttonStates[label] = !(buttonStates[label] ?? false);
-
 
     //NEW BITMAP:
 
@@ -1991,7 +1993,6 @@ List<String> _comboSelection = [];
                                 ),
                               ),
                             ),
-                      
                           ],
                         ),
                       ],
@@ -2148,14 +2149,14 @@ void _sendFunctionFrame() {
     final deviceId = CanBluetooth.instance.connectedDevices.keys.first;
 
     final ledFrameData = [
-      ledBytes[0], // Byte 0: bits for K1–K4
-      0x00, // Byte 1 (not used)
-      0x00, // Byte 2 (not used)
-      0x00, // Byte 3 (not used)
-      _nextTickByte(), // Byte 4 = tick timer removed
+      ledBytes[0], // Byte 0
+      ledBytes[1],
       0x00,
       0x00,
-      0x00
+      _nextTickByte(),
+      0x00,
+      0x00,
+      0x00,
     ];
 
     // Send actual CAN frame
