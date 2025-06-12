@@ -815,7 +815,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       .join(' ')
       .toUpperCase();
 
-  canId = '000001A5'; // ✅ FIXED: this is now for 2x6 (F keys)
+  canId = '000001A5'; 
   final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
   buttonExplanation = combo.isEmpty
     ? 'No buttons pressed'
@@ -828,7 +828,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       .join(' ')
       .toUpperCase();
 
-  canId = '00000195'; // ✅ FIXED: this is now for 2x2 (K keys)
+  canId = '00000195'; 
   final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
  buttonExplanation = combo.isEmpty
     ? 'No buttons pressed'
