@@ -894,9 +894,9 @@ List<String> _comboSelection = [];
       } else {
         ledBytes[byteIndex] &= ~(1 << bitIndex);
       }
-List<int> keyStateMessage = List<int>.from(ledBytes);  // Send all 8 bytes
+  List<int> keyStateMessage = List<int>.from(ledBytes);  // Send all 8 bytes
 
-//removed this on june 12th due to data logging error 
+  //removed this on june 12th due to data logging error 
 /*
       List<int> keyStateMessage = [
         ledBytes[0],
@@ -2078,7 +2078,7 @@ void _sendFunctionFrame() {
 
   void _sendFunctionFrame() {
     final snapshot = Map<String, bool>.from(
-        buttonStates); // ✅ Take a frozen copy of current button states
+        buttonStates); // Take a frozen copy of current button states
 
     // Explicitly update buttonStates from 2x6 bits for Fixed Feed to recognize them
     buttonStates.updateAll((key, value) => false); // Reset all to false
