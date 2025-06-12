@@ -54,6 +54,8 @@ class _AARCommRCUState extends State<AARCommRCU> {
 
   String _currentTestLabel = ''; // Displays "Testing: <control>"
 
+bool _showCanFrame = true; // Toggle visibility of CAN frame log
+
 //NEW
 
   int _comboSize = 1;
@@ -1172,6 +1174,222 @@ class _AARCommRCUState extends State<AARCommRCU> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+
+                       Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
+                          color: Colors.grey.shade900,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20)),
+                          elevation: 6,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.auto_fix_high,
+                                          color: Colors.tealAccent),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Build Your Own Combo',
+                                        style: TextStyle(
+                                          color: Colors.tealAccent,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Number of buttons:',
+                                          style:
+                                              TextStyle(color: Colors.white70)),
+                                      const SizedBox(width: 12),
+                                      DropdownButton<int>(
+                                        value: _comboSize,
+                                        dropdownColor: Colors.black,
+                                        style: const TextStyle(
+                                            color: Colors.white),
+                                        items: List.generate(5, (i) => i + 1)
+                                            .map((n) => DropdownMenuItem(
+                                                  value: n,
+                                                  child: Text('$n'),
+                                                ))
+                                            .toList(),
+                                        onChanged: (val) {
+                                          if (val != null) {
+                                            setState(() {
+                                              _comboSize = val;
+                                              _comboDropdownValues =
+                                                  List.filled(val, null);
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Column(
+                                  children: List.generate(
+                                    (_comboSize / 2)
+                                        .ceil(), // Number of rows = ceil(N / 2)
+                                    (rowIndex) {
+                                      final firstIndex = rowIndex * 2;
+                                      final secondIndex = firstIndex + 1;
+
+                                      return Row(
+                                        children: [
+                                          // First dropdown in row
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(6),
+                                              child: DropdownButtonFormField<
+                                                  String>(
+                                                value: _comboDropdownValues
+                                                            .length >
+                                                        firstIndex
+                                                    ? _comboDropdownValues[
+                                                        firstIndex]
+                                                    : null,
+                                                hint: Text(
+                                                    'Select ${firstIndex + 1}'),
+                                                dropdownColor: Colors.black,
+                                                style: const TextStyle(
+                                                    color: Colors.white),
+                                                decoration: InputDecoration(
+                                                  filled: true,
+                                                  fillColor:
+                                                      Colors.grey.shade800,
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10),
+                                                  ),
+                                                ),
+                                                items: _rcuButtons
+                                                    .where((btn) =>
+                                                        !_comboDropdownValues
+                                                            .contains(btn) ||
+                                                        _comboDropdownValues[
+                                                                firstIndex] ==
+                                                            btn)
+                                                    .map((label) =>
+                                                        DropdownMenuItem(
+                                                          value: label,
+                                                          child: Text(label),
+                                                        ))
+                                                    .toList(),
+                                                onChanged: (val) {
+                                                  setState(() {
+                                                    _comboDropdownValues[
+                                                        firstIndex] = val;
+                                                  });
+                                                },
+                                              ),
+                                            ),
+                                          ),
+
+                                          // Second dropdown in row (if exists)
+                                          if (secondIndex < _comboSize)
+                                            Expanded(
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                child: DropdownButtonFormField<
+                                                    String>(
+                                                  value: _comboDropdownValues[
+                                                      secondIndex],
+                                                  hint: Text(
+                                                      'Select ${secondIndex + 1}'),
+                                                  dropdownColor: Colors.black,
+                                                  style: const TextStyle(
+                                                      color: Colors.white),
+                                                  decoration: InputDecoration(
+                                                    filled: true,
+                                                    fillColor:
+                                                        Colors.grey.shade800,
+                                                    border: OutlineInputBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                    ),
+                                                  ),
+                                                  items: _rcuButtons
+                                                      .where((btn) =>
+                                                          !_comboDropdownValues
+                                                              .contains(btn) ||
+                                                          _comboDropdownValues[
+                                                                  secondIndex] ==
+                                                              btn)
+                                                      .map((label) =>
+                                                          DropdownMenuItem(
+                                                            value: label,
+                                                            child: Text(label),
+                                                          ))
+                                                      .toList(),
+                                                  onChanged: (val) {
+                                                    setState(() {
+                                                      _comboDropdownValues[
+                                                          secondIndex] = val;
+                                                    });
+                                                  },
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            const SizedBox(), // Empty space for alignment if odd count
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Align(
+                                  alignment: Alignment.center,
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.flash_on,
+                                        color: Colors.yellowAccent),
+                                    label: const Text(
+                                      'Build & Send',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Colors.deepPurple.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 5,
+                                    ),
+                                    onPressed: _comboDropdownValues
+                                            .every((e) => e != null)
+                                        ? () {
+                                            _customCombo = _comboDropdownValues
+                                                .whereType<String>()
+                                                .toSet();
+                                            _sendCustomCombo(); // 👈 This must exist and be wired
+                                          }
+                                        : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     Wrap(
                       alignment: WrapAlignment.center,
                       spacing: 12,
@@ -1620,221 +1838,7 @@ class _AARCommRCUState extends State<AARCommRCU> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Reset Timer'),
                         ),
-                        Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 16),
-                          color: Colors.grey.shade900,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          elevation: 6,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(Icons.auto_fix_high,
-                                          color: Colors.tealAccent),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Build Your Own Combo',
-                                        style: TextStyle(
-                                          color: Colors.tealAccent,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text('Number of buttons:',
-                                          style:
-                                              TextStyle(color: Colors.white70)),
-                                      const SizedBox(width: 12),
-                                      DropdownButton<int>(
-                                        value: _comboSize,
-                                        dropdownColor: Colors.black,
-                                        style: const TextStyle(
-                                            color: Colors.white),
-                                        items: List.generate(5, (i) => i + 1)
-                                            .map((n) => DropdownMenuItem(
-                                                  value: n,
-                                                  child: Text('$n'),
-                                                ))
-                                            .toList(),
-                                        onChanged: (val) {
-                                          if (val != null) {
-                                            setState(() {
-                                              _comboSize = val;
-                                              _comboDropdownValues =
-                                                  List.filled(val, null);
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Column(
-                                  children: List.generate(
-                                    (_comboSize / 2)
-                                        .ceil(), // Number of rows = ceil(N / 2)
-                                    (rowIndex) {
-                                      final firstIndex = rowIndex * 2;
-                                      final secondIndex = firstIndex + 1;
-
-                                      return Row(
-                                        children: [
-                                          // First dropdown in row
-                                          Expanded(
-                                            child: Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: DropdownButtonFormField<
-                                                  String>(
-                                                value: _comboDropdownValues
-                                                            .length >
-                                                        firstIndex
-                                                    ? _comboDropdownValues[
-                                                        firstIndex]
-                                                    : null,
-                                                hint: Text(
-                                                    'Select ${firstIndex + 1}'),
-                                                dropdownColor: Colors.black,
-                                                style: const TextStyle(
-                                                    color: Colors.white),
-                                                decoration: InputDecoration(
-                                                  filled: true,
-                                                  fillColor:
-                                                      Colors.grey.shade800,
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            10),
-                                                  ),
-                                                ),
-                                                items: _rcuButtons
-                                                    .where((btn) =>
-                                                        !_comboDropdownValues
-                                                            .contains(btn) ||
-                                                        _comboDropdownValues[
-                                                                firstIndex] ==
-                                                            btn)
-                                                    .map((label) =>
-                                                        DropdownMenuItem(
-                                                          value: label,
-                                                          child: Text(label),
-                                                        ))
-                                                    .toList(),
-                                                onChanged: (val) {
-                                                  setState(() {
-                                                    _comboDropdownValues[
-                                                        firstIndex] = val;
-                                                  });
-                                                },
-                                              ),
-                                            ),
-                                          ),
-
-                                          // Second dropdown in row (if exists)
-                                          if (secondIndex < _comboSize)
-                                            Expanded(
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(6),
-                                                child: DropdownButtonFormField<
-                                                    String>(
-                                                  value: _comboDropdownValues[
-                                                      secondIndex],
-                                                  hint: Text(
-                                                      'Select ${secondIndex + 1}'),
-                                                  dropdownColor: Colors.black,
-                                                  style: const TextStyle(
-                                                      color: Colors.white),
-                                                  decoration: InputDecoration(
-                                                    filled: true,
-                                                    fillColor:
-                                                        Colors.grey.shade800,
-                                                    border: OutlineInputBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10),
-                                                    ),
-                                                  ),
-                                                  items: _rcuButtons
-                                                      .where((btn) =>
-                                                          !_comboDropdownValues
-                                                              .contains(btn) ||
-                                                          _comboDropdownValues[
-                                                                  secondIndex] ==
-                                                              btn)
-                                                      .map((label) =>
-                                                          DropdownMenuItem(
-                                                            value: label,
-                                                            child: Text(label),
-                                                          ))
-                                                      .toList(),
-                                                  onChanged: (val) {
-                                                    setState(() {
-                                                      _comboDropdownValues[
-                                                          secondIndex] = val;
-                                                    });
-                                                  },
-                                                ),
-                                              ),
-                                            )
-                                          else
-                                            const SizedBox(), // Empty space for alignment if odd count
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                Align(
-                                  alignment: Alignment.center,
-                                  child: ElevatedButton.icon(
-                                    icon: const Icon(Icons.flash_on,
-                                        color: Colors.yellowAccent),
-                                    label: const Text(
-                                      'Build & Send',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          Colors.deepPurple.shade700,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 24, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      elevation: 5,
-                                    ),
-                                    onPressed: _comboDropdownValues
-                                            .every((e) => e != null)
-                                        ? () {
-                                            _customCombo = _comboDropdownValues
-                                                .whereType<String>()
-                                                .toSet();
-                                            _sendCustomCombo(); // 👈 This must exist and be wired
-                                          }
-                                        : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                       
                       ],
                     ),
                   ],
@@ -1861,7 +1865,8 @@ class _AARCommRCUState extends State<AARCommRCU> {
               ),
               const SizedBox(height: 16),
               const SizedBox(height: 16),
-              canLogTable(),
+              if (_showCanFrame) canLogTable(),
+
             ],
           ),
         ),
@@ -1920,42 +1925,58 @@ class _AARCommRCUState extends State<AARCommRCU> {
   // - Displays a car icon, a bold title, and a receipt icon
   // - Used to visually label the CAN log display area
 
-  Widget buildCanLogHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Left icon
-          const Icon(Icons.directions_car, color: Colors.tealAccent),
-
-          const SizedBox(width: 8),
-
-          // Section title
-          Text(
-            'CAN Frame Logs',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.tealAccent,
-              shadows: [
-                Shadow(
-                  blurRadius: 3,
-                  color: Colors.black45,
-                  offset: Offset(1, 1),
-                ),
-              ],
+Widget buildCanLogHeader() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12.0),
+    child: Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.directions_car, color: Colors.tealAccent),
+            SizedBox(width: 8),
+            Text(
+              'CAN Frame Logs',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.tealAccent,
+                shadows: [
+                  Shadow(
+                    blurRadius: 3,
+                    color: Colors.black45,
+                    offset: Offset(1, 1),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.receipt_long, color: Colors.tealAccent),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _showCanFrame = !_showCanFrame;
+            });
+          },
+          icon: Icon(_showCanFrame ? Icons.visibility_off : Icons.visibility),
+          label: Text(_showCanFrame ? 'Hide CAN Frame' : 'Show CAN Frame'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.grey.shade800,
+            foregroundColor: Colors.tealAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
+        ),
+      ],
+    ),
+  );
+}
 
-          const SizedBox(width: 8),
-
-          // Right icon
-          const Icon(Icons.receipt_long, color: Colors.tealAccent),
-        ],
-      ),
-    );
-  }
 
   // Builds a stylized header row for the digital control button section
   // - Shows a remote icon, title, and radio button icon

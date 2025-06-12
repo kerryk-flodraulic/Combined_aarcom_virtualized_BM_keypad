@@ -839,6 +839,8 @@ List<String> _comboSelection = [];
   final ScrollController _logScrollController = ScrollController();
   // Handles press logic for 2x2 and 2x6 buttons, updates CAN bytes and logs
   void _handleButtonPress(String label) {
+    label = label.toUpperCase().trim();
+
     HapticFeedback.lightImpact();
     final elapsed = _stopwatch.elapsed;
     final timestamp =
@@ -846,18 +848,7 @@ List<String> _comboSelection = [];
 
     // Toggle the state
     buttonStates[label] = !(buttonStates[label] ?? false);
-    /*
-    // Update 2x6 data bytes if applicable
-    if (buttonBitMap.containsKey(label)) {
-      final byteIndex = buttonBitMap[label]![0];
-      final bitIndex = buttonBitMap[label]![1];
-      if (buttonStates[label] == true) {
-        dataBytes[byteIndex] |= (1 << bitIndex);
-      } else {
-        dataBytes[byteIndex] &= ~(1 << bitIndex);
-      }
-    }
-        */
+
 
     //NEW BITMAP:
 
