@@ -202,7 +202,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
   // NEW BITMAP:
   final Map<String, List<int>> buttonBitMap = {
-    'K1': [0, 0], 
+    'K1': [0, 0],
     'K2': [0, 1],
     'K3': [0, 2],
     'K4': [0, 3],
@@ -375,7 +375,7 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
 
     return [
       //'CH0', // Channel COMMENTED OUT
-      canId.toRadixString(16).padLeft(8, '0'), // Proper dynamic CAN ID
+     canId.toRadixString(16).padLeft(8, '0').toUpperCase(), // Proper dynamic CAN ID
 
       '8', // DLC
       dataString, // Data payload
@@ -787,54 +787,55 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
     String canId;
     String buttonExplanation;
 
-    if (ledButtonMap.containsKey(label)) {
-      final byteIndex = ledButtonMap[label]![0];
-      final bitIndex = ledButtonMap[label]![1];
+   if (ledButtonMap.containsKey(label)) {
+  final byteIndex = ledButtonMap[label]![0];
+  final bitIndex = ledButtonMap[label]![1];
 
-      if (buttonStates[label] == true) {
-        ledBytes[byteIndex] |= (1 << bitIndex);
-      } else {
-        ledBytes[byteIndex] &= ~(1 << bitIndex);
-      }
+  if (buttonStates[label] == true) {
+    ledBytes[byteIndex] |= (1 << bitIndex);
+  } else {
+    ledBytes[byteIndex] &= ~(1 << bitIndex);
+  }
 
-      List<int> keyStateMessage = [
-        ledBytes[0],
-        0x00,
-        0x00,
-        0x00,
-        _nextTickByte(), // Use the updated tick generator(FROM DOC)
-        0x00,
-        0x00,
-        0x00
-      ];
+  List<int> keyStateMessage = [
+    ledBytes[0],
+    0x00,
+    0x00,
+    0x00,
+    _nextTickByte(), // Use the updated tick generator(FROM DOC)
+    0x00,
+    0x00,
+    0x00
+  ];
 
-      _sendLEDFrame(); // Send over Bluetooth
+  _sendLEDFrame(); // Send over Bluetooth
 
-      formattedData = keyStateMessage
-          .map((b) => b.toRadixString(16).padLeft(2, '0'))
-          .join(' ')
-          .toUpperCase();
+  formattedData = keyStateMessage
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join(' ')
+      .toUpperCase();
 
-      canId = '00000195';
-      final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
-      buttonExplanation = combo.isEmpty
-          ? 'No buttons pressed'
-          : combo.join(', ') +
-              (buttonStates[label]! ? ' pressed' : ' released');
-    } else if (buttonBitMap.containsKey(label)) {
-      // For 2x6 functional PKP2600
-      formattedData = dataBytes
-          .map((b) => b.toRadixString(16).padLeft(2, '0'))
-          .join(' ')
-          .toUpperCase();
+  canId = '000001A5'; // ✅ FIXED: this is now for 2x6 (F keys)
+  final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
+  buttonExplanation = combo.isEmpty
+    ? 'No buttons pressed'
+    : combo.join(', ');
 
-      canId = '000001A5';
-      final combo = keypad2x6.where((k) => buttonStates[k] == true).toList();
-      buttonExplanation = combo.isEmpty
-          ? 'No buttons pressed'
-          : combo.join(', ') +
-              (buttonStates[label]! ? ' pressed' : ' released');
-    } else {
+} else if (buttonBitMap.containsKey(label)) {
+  // For 2x2 functional PKP2200
+  formattedData = dataBytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join(' ')
+      .toUpperCase();
+
+  canId = '00000195'; // ✅ FIXED: this is now for 2x2 (K keys)
+  final combo = keypad2x2.where((k) => buttonStates[k] == true).toList();
+ buttonExplanation = combo.isEmpty
+    ? 'No buttons pressed'
+    : combo.join(', ');
+
+}
+ else {
       // Fallback
       formattedData = List.filled(8, 0)
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -851,7 +852,8 @@ class _BMKeypadScreenState extends State<BMKeypadScreen> {
       dlc: '8',
       data: formattedData,
       dir: 'TX',
-      time: (_stopwatch.elapsed.inMilliseconds / 1000).toStringAsFixed(2),
+      time: _elapsedFormatted,
+
       button: buttonExplanation,
     );
 
@@ -1796,8 +1798,11 @@ void _sendFunctionFrame() {
 */
 
   void _sendFunctionFrame() {
+    final snapshot = Map<String, bool>.from(
+        buttonStates); // ✅ Take a frozen copy of current button states
+
     // Explicitly update buttonStates from 2x6 bits for Fixed Feed to recognize them
-  buttonStates.updateAll((key, value) => false); // Reset all to false
+    buttonStates.updateAll((key, value) => false); // Reset all to false
 
 // Recalculate active buttons from dataBytes bits
     buttonBitMap.forEach((key, pos) {
@@ -1838,7 +1843,7 @@ void _sendFunctionFrame() {
         .join(' ');
     final frameKey =
         formattedData + '_1A5'; // or whatever logic you use to make frameKey
-
+/*
     fixedCanHistoryMap[frameKey] = [
       'CH0',
       '1A5',
@@ -1848,7 +1853,7 @@ void _sendFunctionFrame() {
       'TX',
       buttonExplanation,
     ];
-
+*/
     // Send frame if connected
     if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
       CanBluetooth.instance.sendCANMessage(
