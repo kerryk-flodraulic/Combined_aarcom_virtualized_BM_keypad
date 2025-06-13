@@ -910,7 +910,7 @@ List<String> _comboSelection = [];
         0x00
       ];
 */
-      _sendLEDFrame(); // Send over Bluetooth
+    _sendLEDFrame(); // Send over Bluetooth
 
       formattedData = keyStateMessage
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
@@ -2135,14 +2135,19 @@ void _sendFunctionFrame() {
 */
     // Send frame if connected
     if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-      CanBluetooth.instance.sendCANMessage(
-        CanBluetooth.instance.connectedDevices.keys.first,
-        BlueMessage(
-          identifier: 0x1A5,
-          data: dataBytes,
-          flagged: true,
-        ),
-      );
+     final idToSend = keypad2x2.any((k) => buttonStates[k] == true)
+    ? 0x195
+    : 0x1A5;
+
+CanBluetooth.instance.sendCANMessage(
+  CanBluetooth.instance.connectedDevices.keys.first,
+  BlueMessage(
+    identifier: idToSend,
+    data: dataBytes,
+    flagged: true,
+  ),
+);
+
     }
   }
 
@@ -2163,14 +2168,15 @@ void _sendFunctionFrame() {
     ];
 
     // Send actual CAN frame
-    CanBluetooth.instance.sendCANMessage(
-      deviceId,
-      BlueMessage(
-        identifier: 0x195,
-        data: ledFrameData,
-        flagged: true,
-      ),
-    );
+CanBluetooth.instance.sendCANMessage(
+  deviceId,
+  BlueMessage(
+    identifier: 0x1A5, 
+    data: ledFrameData,
+    flagged: true,
+  ),
+);
+
   }
 }
 
