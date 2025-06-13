@@ -352,7 +352,7 @@ List<String> _comboSelection = [];
 
       // Send Cleared Frame PKP2200
       final clearedFrame = BlueMessage(
-        identifier: 0x195,
+        identifier: 0x1A5,
         data: List.filled(8, 0x00),
         flagged: true,
       );
@@ -458,10 +458,19 @@ List<String> _comboSelection = [];
     });
   }
 
-  List<int> getByteValues() {
-    final activeKeys = buttonStates.values.any((v) => v == true);
-    return activeKeys ? dataBytes : List.filled(8, 0x00);
+List<int> getByteValues() {
+  final activeKeys = buttonStates.entries.where((e) => e.value == true).toList();
+  if (activeKeys.any((e) => keypad2x2.contains(e.key))) {
+    final bytes = List<int>.from(dataBytes);
+    bytes[4] = _nextTickByte(); // inject tick
+    return bytes;
+  } else if (activeKeys.any((e) => keypad2x6.contains(e.key))) {
+    return List<int>.from(ledBytes);
+  } else {
+    return List.filled(8, 0x00); // idle
   }
+}
+
 
   List<String> createCanFrame(List<int> bytes, Duration duration, int canId) {
     final formattedTime = _formatDuration(duration);
@@ -897,7 +906,7 @@ List<String> _comboSelection = [];
   List<int> keyStateMessage = List<int>.from(ledBytes);  // Send all 8 bytes
 
   //removed this on june 12th due to data logging error 
-/*
+      /*
       List<int> keyStateMessage = [
         ledBytes[0],
         0x00,
@@ -909,7 +918,7 @@ List<String> _comboSelection = [];
         0x00,
         0x00
       ];
-*/
+      */
     _sendLEDFrame(); // Send over Bluetooth
 
       formattedData = keyStateMessage
@@ -2059,22 +2068,10 @@ List<String> _comboSelection = [];
       ),
     );
   }
-/*
-void _sendFunctionFrame() {
-  if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-    CanBluetooth.instance.sendCANMessage(
-      CanBluetooth.instance.connectedDevices.keys.first,
-      BlueMessage(
-        identifier: 0x1A5,
-        data: dataBytes,
-        flagged: true,
-      ),
-    );
-  }
-}
 
 
-*/
+
+
 
   void _sendFunctionFrame() {
     final snapshot = Map<String, bool>.from(
@@ -2083,7 +2080,7 @@ void _sendFunctionFrame() {
     // Explicitly update buttonStates from 2x6 bits for Fixed Feed to recognize them
     buttonStates.updateAll((key, value) => false); // Reset all to false
 
-// Recalculate active buttons from dataBytes bits
+      // Recalculate active buttons from dataBytes bits
     buttonBitMap.forEach((key, pos) {
       final byte = dataBytes[pos[0]];
       final isPressed = (byte & (1 << pos[1])) != 0;
@@ -2093,12 +2090,7 @@ void _sendFunctionFrame() {
     // Reset 8-byte array
     dataBytes = List.filled(8, 0);
 
-    // Fill bits for KP2x2 buttons (K1–K4)
-    ledButtonMap.forEach((key, pos) {
-      if (buttonStates[key] == true) {
-        dataBytes[pos[0]] |= (1 << pos[1]);
-      }
-    });
+
 
     // Fill bits for KP2x6 buttons (F1–F12)
     buttonBitMap.forEach((key, pos) {
@@ -2122,7 +2114,7 @@ void _sendFunctionFrame() {
         .join(' ');
     final frameKey =
         formattedData + '_1A5'; // or whatever logic you use to make frameKey
-/*
+  /*
     fixedCanHistoryMap[frameKey] = [
       'CH0',
       '1A5',
@@ -2135,19 +2127,14 @@ void _sendFunctionFrame() {
 */
     // Send frame if connected
     if (CanBluetooth.instance.connectedDevices.isNotEmpty) {
-     final idToSend = keypad2x2.any((k) => buttonStates[k] == true)
-    ? 0x195
-    : 0x1A5;
-
-CanBluetooth.instance.sendCANMessage(
-  CanBluetooth.instance.connectedDevices.keys.first,
-  BlueMessage(
-    identifier: idToSend,
-    data: dataBytes,
-    flagged: true,
-  ),
-);
-
+      CanBluetooth.instance.sendCANMessage(
+        CanBluetooth.instance.connectedDevices.keys.first,
+        BlueMessage(
+          identifier: 0x1A5,
+          data: dataBytes,
+          flagged: true,
+        ),
+      );
     }
   }
 
@@ -2168,16 +2155,16 @@ CanBluetooth.instance.sendCANMessage(
     ];
 
     // Send actual CAN frame
-CanBluetooth.instance.sendCANMessage(
-  deviceId,
-  BlueMessage(
-    identifier: 0x1A5, 
-    data: ledFrameData,
-    flagged: true,
-  ),
-);
-
+    CanBluetooth.instance.sendCANMessage(
+      deviceId,
+      BlueMessage(
+        identifier: 0x195,
+        data: ledFrameData,
+        flagged: true,
+      ),
+    );
   }
+  
 }
 
 const TextStyle _headerStyle = TextStyle(
